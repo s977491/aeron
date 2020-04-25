@@ -128,7 +128,7 @@ allprojects {
 
 subprojects {
     apply plugin: 'java-library'
-    apply plugin: 'checkstyle'
+//    apply plugin: 'checkstyle'
     apply plugin: 'eclipse'
     apply plugin: 'io.freefair.javadoc-links'
 
@@ -143,7 +143,7 @@ subprojects {
     group = aeronGroup
     version = aeronVersion
 
-    checkstyle.toolVersion = "${checkstyleVersion}"
+//    checkstyle.toolVersion = "${checkstyleVersion}"
 
     tasks.withType(Sign) {
         onlyIf {
@@ -368,6 +368,13 @@ project(':aeron-archive') {
         api files('build/classes/java/generated')
         codecGeneration "uk.co.real-logic:sbe-tool:${sbeVersion}"
         testImplementation project(':aeron-test-support')
+
+        codecGeneration("org.agrona:agrona") {
+            version {
+                strictly(agronaVersionRange)
+                prefer(agronaVersion)
+            }
+        }
     }
 
     def generatedDir = file("${buildDir}/generated-src")

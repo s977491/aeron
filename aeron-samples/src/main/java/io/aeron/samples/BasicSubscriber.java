@@ -45,7 +45,7 @@ public class BasicSubscriber
 
     public static void main(final String[] args)
     {
-        System.out.println("Subscribing to " + CHANNEL + " on stream id " + STREAM_ID);
+        System.out.println("Subscribing 2 to " + CHANNEL + " on stream id " + STREAM_ID);
 
         final MediaDriver driver = EMBEDDED_MEDIA_DRIVER ? MediaDriver.launchEmbedded() : null;
         final Aeron.Context ctx = new Aeron.Context()

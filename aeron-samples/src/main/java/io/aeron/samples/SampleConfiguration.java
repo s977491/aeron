@@ -64,7 +64,8 @@ public class SampleConfiguration
 
     static
     {
-        CHANNEL = System.getProperty(CHANNEL_PROP, "aeron:udp?endpoint=localhost:40123");
+//        CHANNEL = System.getProperty(CHANNEL_PROP, "aeron:udp?endpoint=localhost:40123");
+        CHANNEL = System.getProperty(CHANNEL_PROP, "aeron:udp?endpoint=224.0.0.1:40123|fc=min|interface=42.0.0.0/8|ttl=10");
         STREAM_ID = Integer.getInteger(STREAM_ID_PROP, 1001);
         PING_CHANNEL = System.getProperty(PING_CHANNEL_PROP, "aeron:udp?endpoint=localhost:40123");
         PONG_CHANNEL = System.getProperty(PONG_CHANNEL_PROP, "aeron:udp?endpoint=localhost:40124");

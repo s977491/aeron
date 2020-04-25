@@ -30,6 +30,7 @@ import org.agrona.concurrent.status.CountersReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -45,6 +46,8 @@ import static java.nio.channels.FileChannel.MapMode.READ_ONLY;
  */
 public class SamplesUtil
 {
+    private static long startTime;
+
     /**
      * Return a reusable, parametrised event loop that calls a default idler when no messages are received.
      *
@@ -94,22 +97,27 @@ public class SamplesUtil
             };
     }
 
+    private ByteBuffer result = ByteBuffer.allocate(10000);
     /**
      * Return a reusable, parametrised {@link FragmentHandler} that prints to stdout.
      *
      * @param streamId to show when printing.
      * @return subscription data handler function that prints the message contents.
      */
+    private static int count;
     public static FragmentHandler printStringMessage(final int streamId)
     {
-        return (buffer, offset, length, header) ->
+        return (buffer, offset, length, headecountr) ->
         {
-            final byte[] data = new byte[length];
-            buffer.getBytes(offset, data);
+            if (count++ == 0) {
+                startTime = System.nanoTime();
+            }
+//            final byte[] data = new byte[length];
+//            buffer.getBytes(offset, data);
 
-            System.out.println(String.format(
-                "Message to stream %d from session %d (%d@%d) <<%s>>",
-                streamId, header.sessionId(), length, offset, new String(data)));
+//            System.out.println(String.format(
+//                "Message to stream %d from session %d (%d@%d) <<%s>>",
+//                streamId, header.sessionId(), length, offset, new String(data)));
         };
     }
 
@@ -185,6 +193,8 @@ public class SamplesUtil
     public static void printUnavailableImage(final Image image)
     {
         final Subscription subscription = image.subscription();
+        System.out.println(count);
+        System.out.println(count * 1000_000_000L / (System.nanoTime() - startTime));
         System.out.println(String.format(
             "Unavailable image on %s streamId=%d sessionId=%d",
             subscription.channel(), subscription.streamId(), image.sessionId()));

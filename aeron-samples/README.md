@@ -40,3 +40,19 @@ In the [archive](https://github.com/real-logic/aeron/tree/master/aeron-samples/s
 or package, you can find samples for recording and replay of streams from an Archive.
 
     aeron-samples/scripts/archive/
+
+
+
+gsettings set org.gnome.mutter.wayland.keybindings switch-to-session-1 "[]"
+gsettings set org.gnome.mutter.wayland.keybindings switch-to-session-2 "[]"
+gsettings set org.gnome.mutter.wayland.keybindings switch-to-session-3 "[]"
+gsettings set org.gnome.mutter.wayland.keybindings switch-to-session-4 "[]"
+gsettings set org.gnome.mutter.wayland.keybindings switch-to-session-5 "[]"
+gsettings set org.gnome.mutter.wayland.keybindings switch-to-session-6 "[]"
+gsettings set org.gnome.mutter.wayland.keybindings switch-to-session-7 "[]"
+gsettings set org.gnome.mutter.wayland.keybindings switch-to-session-8 "[]"
+gsettings set org.gnome.mutter.wayland.keybindings switch-to-session-9 "[]"
+gsettings set org.gnome.mutter.wayland.keybindings switch-to-session-10 "[]"
+gsettings set org.gnome.mutter.wayland.keybindings switch-to-session-11 "[]"
+gsettings set org.gnome.mutter.wayland.keybindings switch-to-session-12 "[]"
+gsettings set org.gnome.mutter.wayland.keybindings switch-to-session-13 "[]"
