@@ -16,12 +16,17 @@
 package io.aeron.samples;
 
 import io.aeron.Aeron;
+import io.aeron.Image;
 import io.aeron.Subscription;
 import io.aeron.driver.MediaDriver;
 import io.aeron.logbuffer.FragmentHandler;
+import io.aeron.logbuffer.Header;
+import org.HdrHistogram.Histogram;
 import org.agrona.CloseHelper;
+import org.agrona.DirectBuffer;
 import org.agrona.concurrent.SigInt;
 
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -42,6 +47,7 @@ public class BasicSubscriber
     private static final String CHANNEL = SampleConfiguration.CHANNEL;
     private static final int FRAGMENT_COUNT_LIMIT = SampleConfiguration.FRAGMENT_COUNT_LIMIT;
     private static final boolean EMBEDDED_MEDIA_DRIVER = SampleConfiguration.EMBEDDED_MEDIA_DRIVER;
+    private static final Histogram HISTOGRAM = new Histogram(TimeUnit.SECONDS.toNanos(10), 3);
 
     public static void main(final String[] args)
     {
@@ -50,14 +56,14 @@ public class BasicSubscriber
         final MediaDriver driver = EMBEDDED_MEDIA_DRIVER ? MediaDriver.launchEmbedded() : null;
         final Aeron.Context ctx = new Aeron.Context()
             .availableImageHandler(SamplesUtil::printAvailableImage)
-            .unavailableImageHandler(SamplesUtil::printUnavailableImage);
+            .unavailableImageHandler(BasicSubscriber::unavail);
 
         if (EMBEDDED_MEDIA_DRIVER)
         {
             ctx.aeronDirectoryName(driver.aeronDirectoryName());
         }
 
-        final FragmentHandler fragmentHandler = SamplesUtil.printStringMessage(STREAM_ID);
+        final FragmentHandler fragmentHandler = BasicSubscriber::handler;
         final AtomicBoolean running = new AtomicBoolean(true);
 
         // Register a SIGINT handler for graceful shutdown.
@@ -68,6 +74,7 @@ public class BasicSubscriber
         // channel and stream ID.
         // The Aeron and Subscription classes implement "AutoCloseable" and will automatically
         // clean up resources when this try block is finished
+        HISTOGRAM.reset();
         try (Aeron aeron = Aeron.connect(ctx);
             Subscription subscription = aeron.addSubscription(CHANNEL, STREAM_ID))
         {
@@ -77,5 +84,25 @@ public class BasicSubscriber
         }
 
         CloseHelper.quietClose(driver);
+    }
+
+    private static void unavail(Image image) {
+        SamplesUtil.printUnavailableImage(image);
+
+        HISTOGRAM.outputPercentileDistribution(System.out, 1000.0);
+
+    }
+
+    private static void handler(DirectBuffer directBuffer, int i, int len, Header header) {
+        SamplesUtil.test(1);
+//        SamplesUtil.printStringMessage(STREAM_ID);
+        long start = directBuffer.getLong(i);
+        long end = System.nanoTime();
+        if (start > end ) {
+            System.out.println("Start:" + start + ", end" + end);
+        }
+        else {
+            HISTOGRAM.recordValue(end - start);
+        }
     }
 }

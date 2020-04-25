@@ -120,7 +120,20 @@ public class SamplesUtil
 //                streamId, header.sessionId(), length, offset, new String(data)));
         };
     }
+    public static void test(final int streamId)
+    {
+        {
+            if (count++ == 0) {
+                startTime = System.nanoTime();
+            }
+//            final byte[] data = new byte[length];
+//            buffer.getBytes(offset, data);
 
+//            System.out.println(String.format(
+//                "Message to stream %d from session %d (%d@%d) <<%s>>",
+//                streamId, header.sessionId(), length, offset, new String(data)));
+        };
+    }
     /**
      * Return a reusable, parametrised {@link FragmentHandler} that calls into a
      * {@link RateReporter}.

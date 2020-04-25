@@ -66,13 +66,12 @@ public class BasicPublisher {
                     System.out.println("MPS" + ((0x1FF) * 1000000000L / (thisTime - lastTime)));
                     lastTime = thisTime;
                 }
-                final String message = "Hello World! " + i;
-                final byte[] messageBytes = message.getBytes();
-                BUFFER.putBytes(0, messageBytes);
-
+//                final String message = "Hello World! " + i;
+//                final byte[] messageBytes = message.getBytes();
+                BUFFER.putLong(0, System.nanoTime());
 //                System.out.print("Offering " + i + "/" + NUMBER_OF_MESSAGES + " - ");
 
-                final long result = publication.offer(BUFFER, 0, messageBytes.length);
+                final long result = publication.offer(BUFFER, 0, Long.BYTES);
 
                 if (result < 0L) {
                     if (result == Publication.BACK_PRESSURED) {
