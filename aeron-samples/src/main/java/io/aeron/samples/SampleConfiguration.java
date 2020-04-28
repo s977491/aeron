@@ -22,6 +22,10 @@ import org.agrona.concurrent.IdleStrategy;
  */
 public class SampleConfiguration
 {
+    public static final String CONTROL_REQUEST_CHANNEL = "aeron:udp?endpoint=localhost:8095";
+    public static final String CONTROL_RESPONSE_CHANNEL = "aeron:udp?endpoint=localhost:8096";
+    public static final String REPLICATION_CHANNEL = "aeron:udp?endpoint=localhost:8040";
+
     public static final String CHANNEL_PROP = "aeron.sample.channel";
     public static final String STREAM_ID_PROP = "aeron.sample.streamId";
 
@@ -64,8 +68,9 @@ public class SampleConfiguration
 
     static
     {
+        CHANNEL = System.getProperty(CHANNEL_PROP, "aeron:ipc");
 //        CHANNEL = System.getProperty(CHANNEL_PROP, "aeron:udp?endpoint=localhost:40123");
-        CHANNEL = System.getProperty(CHANNEL_PROP, "aeron:udp?endpoint=224.0.0.1:40123|fc=max|reliable=true|interface=42.0.0.0/8|ttl=10");
+//        CHANNEL = System.getProperty(CHANNEL_PROP, "aeron:udp?endpoint=224.0.0.1:40123|fc=max|reliable=true|interface=42.0.0.0/8|ttl=10|timeout=10us");
         STREAM_ID = Integer.getInteger(STREAM_ID_PROP, 1001);
         PING_CHANNEL = System.getProperty(PING_CHANNEL_PROP, "aeron:udp?endpoint=localhost:40123");
         PONG_CHANNEL = System.getProperty(PONG_CHANNEL_PROP, "aeron:udp?endpoint=localhost:40124");
