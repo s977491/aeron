@@ -18,9 +18,8 @@ package io.aeron.samples.archive;
 import io.aeron.Aeron;
 import io.aeron.ChannelUri;
 import io.aeron.Subscription;
-import io.aeron.archive.client.AeronArchive;
-import io.aeron.archive.client.RecordingDescriptorConsumer;
-import io.aeron.archive.client.RecordingSignalAdapter;
+import io.aeron.archive.client.*;
+import io.aeron.archive.codecs.ControlResponseCode;
 import io.aeron.archive.codecs.RecordingSignal;
 import io.aeron.logbuffer.FragmentHandler;
 import io.aeron.samples.SampleConfiguration;
@@ -33,6 +32,8 @@ import org.agrona.concurrent.YieldingIdleStrategy;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static io.aeron.Aeron.NULL_VALUE;
+import static io.aeron.samples.SampleConfiguration.SRC_CONTROL_REQUEST_CHANNEL;
+import static io.aeron.samples.SampleConfiguration.dstAeronDirectoryName;
 
 /**
  * A basic subscriber application which requests a replay from the archive and consumes it.
@@ -57,13 +58,13 @@ public class ReplicatedRemoteSubscriber
         SigInt.register(() -> running.set(false));
 
         Aeron aeron = Aeron.connect(
-                new Aeron.Context());
+                new Aeron.Context().aeronDirectoryName(dstAeronDirectoryName));
 
         // Create a unique response stream id so not to clash with other archive clients.
         final AeronArchive.Context archiveCtx = new AeronArchive.Context()
                 .idleStrategy(YieldingIdleStrategy.INSTANCE)
-                .controlRequestChannel(SampleConfiguration.CONTROL_REQUEST_CHANNEL)
-                .controlResponseChannel(SampleConfiguration.CONTROL_RESPONSE_CHANNEL)
+                .controlRequestChannel(SampleConfiguration.DST_CONTROL_REQUEST_CHANNEL)
+                .controlResponseChannel(SampleConfiguration.DST_CONTROL_RESPONSE_CHANNEL)
                 .aeron(aeron);
 
         try (AeronArchive archive = AeronArchive.connect(archiveCtx))
@@ -72,15 +73,37 @@ public class ReplicatedRemoteSubscriber
             final long position = 0L;
             final long length = Long.MAX_VALUE;
 
-//            final MutableLong dstRecordingId = new MutableLong();
-//            final MutableReference<RecordingSignal> signalRef = new MutableReference<>();
-//            final RecordingSignalAdapter adapter = newRecordingSignalAdapter(signalRef, dstRecordingId);
-
+//
             archive.replicate(
-                    recordingId, NULL_VALUE, AeronArchive.Configuration.CONTROL_STREAM_ID_DEFAULT,
-                    "aeron:udp?endpoint=192.168.86.20:8095", null);
+                    recordingId, 1, AeronArchive.Configuration.CONTROL_STREAM_ID_DEFAULT,
+                    SRC_CONTROL_REQUEST_CHANNEL, null);
+//
+            final MutableLong dstRecordingId = new MutableLong();
+            final MutableReference<RecordingSignal> signalRef = new MutableReference<>();
+            final RecordingSignalAdapter adapter = newRecordingSignalAdapter(signalRef, dstRecordingId, archive);
 
-            final long sessionId = archive.startReplay(recordingId, position, length, CHANNEL, REPLAY_STREAM_ID);
+            signalRef.set(null);
+            do
+            {
+                while (0 == adapter.poll())
+                {
+                    Thread.yield();
+                }
+            }
+            while (signalRef.get() == null);
+
+            signalRef.set(null);
+            do
+            {
+                while (0 == adapter.poll())
+                {
+                    Thread.yield();
+                }
+            }
+            while (signalRef.get() == null);
+            //assertEquals(RecordingSignal.REPLICATE, signalRef.get());
+
+            final long sessionId = archive.startReplay(recordingId, 0, AeronArchive.NULL_LENGTH, CHANNEL, REPLAY_STREAM_ID);
             final String channel = ChannelUri.addSessionId(CHANNEL, (int)sessionId);
 
             try (Subscription subscription = archive.context().aeron().addSubscription(channel, REPLAY_STREAM_ID))
@@ -91,6 +114,40 @@ public class ReplicatedRemoteSubscriber
         }
     }
 
+    private static RecordingSignalAdapter newRecordingSignalAdapter(
+            MutableReference<RecordingSignal> signalRef,
+            MutableLong recordingIdRef,
+            AeronArchive dstAeronArchive) {
+        final ControlEventListener listener =
+                (controlSessionId, correlationId, relevantId, code, errorMessage) ->
+                {
+                    if (code == ControlResponseCode.ERROR)
+                    {
+                        throw new ArchiveException(errorMessage, (int)relevantId, correlationId);
+                    }
+                };
+
+        return newRecordingSignalAdapter(listener, signalRef, recordingIdRef, dstAeronArchive);
+
+    }
+    private static RecordingSignalAdapter newRecordingSignalAdapter(
+            final ControlEventListener listener,
+            final MutableReference<RecordingSignal> signalRef,
+            final MutableLong recordingIdRef,
+            AeronArchive dstAeronArchive)
+    {
+        final RecordingSignalConsumer consumer =
+                (controlSessionId, correlationId, recordingId, subscriptionId, position, transitionType) ->
+                {
+                    recordingIdRef.set(recordingId);
+                    signalRef.set(transitionType);
+                };
+
+        final Subscription subscription = dstAeronArchive.controlResponsePoller().subscription();
+        final long controlSessionId = dstAeronArchive.controlSessionId();
+
+        return new RecordingSignalAdapter(controlSessionId, listener, consumer, subscription, 10);
+    }
     private static FragmentHandler printStringMessage(int streamId) {
             return (buffer, offset, length, header) ->
             {

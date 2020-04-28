@@ -57,8 +57,8 @@ public class ReplicatedBasicSubscriber
         // Create a unique response stream id so not to clash with other archive clients.
         final AeronArchive.Context archiveCtx = new AeronArchive.Context()
                 .idleStrategy(YieldingIdleStrategy.INSTANCE)
-                .controlRequestChannel(SampleConfiguration.CONTROL_REQUEST_CHANNEL)
-                .controlResponseChannel(SampleConfiguration.CONTROL_RESPONSE_CHANNEL)
+                .controlRequestChannel(SampleConfiguration.SRC_CONTROL_REQUEST_CHANNEL)
+                .controlResponseChannel(SampleConfiguration.SRC_CONTROL_RESPONSE_CHANNEL)
                 .aeron(aeron);
 
         try (AeronArchive archive = AeronArchive.connect(archiveCtx))

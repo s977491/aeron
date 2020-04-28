@@ -6,7 +6,6 @@ import io.aeron.archive.ArchivingMediaDriver;
 import io.aeron.archive.client.AeronArchive;
 import io.aeron.driver.MediaDriver;
 import io.aeron.driver.ThreadingMode;
-import io.aeron.exceptions.AeronException;
 import io.aeron.samples.SampleConfiguration;
 import org.agrona.SystemUtil;
 import org.agrona.concurrent.ShutdownSignalBarrier;
@@ -14,16 +13,9 @@ import org.agrona.concurrent.ShutdownSignalBarrier;
 import java.io.File;
 
 import static io.aeron.CommonContext.generateRandomDirName;
+import static io.aeron.samples.SampleConfiguration.dstAeronDirectoryName;
 
-public class ReplicateMediaDriver {
-    public static void onError(final Throwable ex) {
-        if (ex instanceof AeronException && ((AeronException) ex).category() == AeronException.Category.WARN) {
-            System.out.println("Warning: " + ex.getMessage());
-            return;
-        }
-
-        ex.printStackTrace();
-    }
+public class ReplicateMediaDriverDST {
 
     public static void main(String[] args) {
         final ShutdownSignalBarrier barrier = new ShutdownSignalBarrier();
@@ -32,22 +24,22 @@ public class ReplicateMediaDriver {
         ctx.terminationHook(barrier::signal);
         try (ArchivingMediaDriver ignore = ArchivingMediaDriver.launch(
                 new MediaDriver.Context()
-                        .aeronDirectoryName(SampleConfiguration.srcAeronDirectoryName)
+                        .aeronDirectoryName(dstAeronDirectoryName)
                         .termBufferSparseFile(true)
                         .threadingMode(ThreadingMode.SHARED)
-                        .errorHandler(ReplicateMediaDriver::onError)
+//                        .errorHandler(Tests::onError)
                         .spiesSimulateConnection(true)
                         .dirDeleteOnStart(true),
                 new Archive.Context()
-                        .aeronDirectoryName(SampleConfiguration.srcAeronDirectoryName)
-                        .controlChannel(SampleConfiguration.SRC_CONTROL_REQUEST_CHANNEL)
-                        .archiveClientContext(new AeronArchive.Context().controlResponseChannel(SampleConfiguration.SRC_CONTROL_RESPONSE_CHANNEL))
+                        .aeronDirectoryName(dstAeronDirectoryName)
+                        .controlChannel(SampleConfiguration.DST_CONTROL_REQUEST_CHANNEL)
+                        .archiveClientContext(new AeronArchive.Context().controlResponseChannel(SampleConfiguration.DST_CONTROL_RESPONSE_CHANNEL))
                         .recordingEventsEnabled(false)
-                        .replicationChannel(SampleConfiguration.SRC_REPLICATION_CHANNEL)
+                        .replicationChannel(SampleConfiguration.DST_REPLICATION_CHANNEL)
                         .deleteArchiveOnStart(true)
-                        .archiveDir(new File(SystemUtil.tmpDirName(), "src-archive"))
+                        .archiveDir(new File(SystemUtil.tmpDirName(), "dst-archive"))
                         .fileSyncLevel(0)
-                        .threadingMode(ArchiveThreadingMode.SHARED))) {
+                        .threadingMode(ArchiveThreadingMode.DEDICATED))) {
             System.out.println("Started");
             barrier.await();
 

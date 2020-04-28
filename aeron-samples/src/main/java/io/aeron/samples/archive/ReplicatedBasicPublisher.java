@@ -31,6 +31,8 @@ import org.agrona.concurrent.status.CountersReader;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static io.aeron.samples.SampleConfiguration.srcAeronDirectoryName;
+
 /**
  * Basic Aeron publisher application which is recorded in an archive.
  * This publisher sends a fixed number of messages on a channel and stream ID.
@@ -56,13 +58,13 @@ public class ReplicatedBasicPublisher
         SigInt.register(() -> running.set(false));
 
         Aeron aeron = Aeron.connect(
-                new Aeron.Context());
+                new Aeron.Context().aeronDirectoryName(srcAeronDirectoryName));
 
         // Create a unique response stream id so not to clash with other archive clients.
         final AeronArchive.Context archiveCtx = new AeronArchive.Context()
                 .idleStrategy(YieldingIdleStrategy.INSTANCE)
-                .controlRequestChannel(SampleConfiguration.CONTROL_REQUEST_CHANNEL)
-                .controlResponseChannel(SampleConfiguration.CONTROL_RESPONSE_CHANNEL)
+                .controlRequestChannel(SampleConfiguration.SRC_CONTROL_REQUEST_CHANNEL)
+                .controlResponseChannel(SampleConfiguration.SRC_CONTROL_RESPONSE_CHANNEL)
                 .aeron(aeron);
 
         try (AeronArchive archive = AeronArchive.connect(archiveCtx))

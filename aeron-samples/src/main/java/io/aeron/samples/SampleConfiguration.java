@@ -15,6 +15,7 @@
  */
 package io.aeron.samples;
 
+import io.aeron.archive.client.AeronArchive;
 import org.agrona.concurrent.IdleStrategy;
 
 /**
@@ -22,9 +23,13 @@ import org.agrona.concurrent.IdleStrategy;
  */
 public class SampleConfiguration
 {
-    public static final String CONTROL_REQUEST_CHANNEL = "aeron:udp?endpoint=localhost:8095";
-    public static final String CONTROL_RESPONSE_CHANNEL = "aeron:udp?endpoint=localhost:8096";
-    public static final String REPLICATION_CHANNEL = "aeron:udp?endpoint=localhost:8040";
+    public static final int SRC_CONTROL_STREAM_ID = AeronArchive.Configuration.CONTROL_STREAM_ID_DEFAULT;
+    public static final String SRC_CONTROL_REQUEST_CHANNEL = "aeron:udp?endpoint=localhost:8090";
+    public static final String SRC_CONTROL_RESPONSE_CHANNEL = "aeron:udp?endpoint=localhost:8091";
+    public static final String DST_CONTROL_REQUEST_CHANNEL = "aeron:udp?endpoint=localhost:8095";
+    public static final String DST_CONTROL_RESPONSE_CHANNEL = "aeron:udp?endpoint=localhost:8096";
+    public static final String SRC_REPLICATION_CHANNEL = "aeron:udp?endpoint=localhost:8040";
+    public static final String DST_REPLICATION_CHANNEL = "aeron:udp?endpoint=localhost:8041";
 
     public static final String CHANNEL_PROP = "aeron.sample.channel";
     public static final String STREAM_ID_PROP = "aeron.sample.streamId";
@@ -65,6 +70,8 @@ public class SampleConfiguration
     public static final long NUMBER_OF_MESSAGES;
     public static final long LINGER_TIMEOUT_MS;
     public static final boolean EXCLUSIVE_PUBLICATIONS;
+    public static String srcAeronDirectoryName = "/home/arthurlcc/tmp/ArthurSrcAeronDirectoryName";
+    public static String dstAeronDirectoryName = "/home/arthurlcc/tmp/ArthurDstAeronDirectoryName";
 
     static
     {
