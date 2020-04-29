@@ -18,27 +18,24 @@ package io.aeron.samples.archive;
 import io.aeron.Aeron;
 import io.aeron.ChannelUri;
 import io.aeron.Subscription;
-import io.aeron.archive.client.*;
-import io.aeron.archive.codecs.ControlResponseCode;
-import io.aeron.archive.codecs.RecordingSignal;
+import io.aeron.archive.client.AeronArchive;
+import io.aeron.archive.client.RecordingDescriptorConsumer;
 import io.aeron.logbuffer.FragmentHandler;
 import io.aeron.samples.SampleConfiguration;
 import io.aeron.samples.SamplesUtil;
 import org.agrona.collections.MutableLong;
-import org.agrona.collections.MutableReference;
 import org.agrona.concurrent.SigInt;
 import org.agrona.concurrent.YieldingIdleStrategy;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static io.aeron.Aeron.NULL_VALUE;
 import static io.aeron.samples.SampleConfiguration.SRC_CONTROL_REQUEST_CHANNEL;
 import static io.aeron.samples.SampleConfiguration.dstAeronDirectoryName;
 
 /**
  * A basic subscriber application which requests a replay from the archive and consumes it.
  */
-public class ReplicatedRemoteSubscriber
+public class ReplicatedRemoteSubscriberByReplay
 {
     private static final int STREAM_ID = SampleConfiguration.STREAM_ID;
 
@@ -72,6 +69,8 @@ public class ReplicatedRemoteSubscriber
             final long recordingId = 0;
             final long position = 0L;
             final long length = Long.MAX_VALUE;
+
+//
             archive.replicate(
                     recordingId, Aeron.NULL_VALUE, AeronArchive.Configuration.CONTROL_STREAM_ID_DEFAULT,
                     SRC_CONTROL_REQUEST_CHANNEL, null);
@@ -82,7 +81,7 @@ public class ReplicatedRemoteSubscriber
             System.out.println("Signal return: " + recordingSignalMonitor.getSignal());
             recordingSignalMonitor.waitForSignal(archive, 1000);
             System.out.println("Signal return: " + recordingSignalMonitor.getSignal());
-//            //assertEquals(RecordingSignal.REPLICATE, signalRef.get());
+            //assertEquals(RecordingSignal.REPLICATE, signalRef.get());
 
             final long sessionId = archive.startReplay(recordingId, 0, AeronArchive.NULL_LENGTH, CHANNEL, REPLAY_STREAM_ID);
             final String channel = ChannelUri.addSessionId(CHANNEL, (int)sessionId);

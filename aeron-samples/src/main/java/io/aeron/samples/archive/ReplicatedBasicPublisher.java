@@ -108,14 +108,19 @@ public class ReplicatedBasicPublisher {
             int count = updateWithLatestRecording(CHANNEL, archive);
             if (count > 0) {
                 System.out.println("extending");
-                CHANNEL = RECORDED_CHANNEL_BUILDER.initialPosition(stopPosition, initialTermId, termBufferLength)
+                CHANNEL = RECORDED_CHANNEL_BUILDER.sessionId(sessionId).initialPosition(stopPosition, initialTermId, termBufferLength)
                                                   .mtu(mtuLength)
                                                   .build();
-                recordingSubId = archive.extendRecording(recordingId, CHANNEL, STREAM_ID, LOCAL);
+                try {
+                    recordingSubId = archive.extendRecording(recordingId, CHANNEL, STREAM_ID, LOCAL);
+                } catch (Exception e) {
+                    //already replicated... just go on.
+                    System.out.println("Already replicating, may just continue publish ");
+                }
 
             } else {
                 System.out.println("Start new recording!");
-                recordingSubId = archive.startRecording(CHANNEL, STREAM_ID, SourceLocation.LOCAL);
+                recordingSubId = archive.startRecording(CHANNEL, STREAM_ID, SourceLocation.REMOTE, true);
                 newRecording = true;
             }
 
@@ -168,7 +173,7 @@ public class ReplicatedBasicPublisher {
 //                }
             } finally {
                 System.out.println("Done sending.");
-                archive.stopRecording(recordingSubId);
+                archive.stopRecording(CHANNEL, STREAM_ID);
             }
         }
     }
