@@ -52,7 +52,6 @@ public class ReplicatedBasicPublisher {
     private static final long NUMBER_OF_MESSAGES = SampleConfiguration.NUMBER_OF_MESSAGES;
 
     private static final UnsafeBuffer BUFFER = new UnsafeBuffer(BufferUtil.allocateDirectAligned(256, 64));
-    private static int initialTermId;
     private static final ChannelUriStringBuilder RECORDED_CHANNEL_BUILDER = new ChannelUriStringBuilder()
             .media("ipc");
 //            .endpoint("localhost:3333")
@@ -62,6 +61,7 @@ public class ReplicatedBasicPublisher {
             .media("ipc")
 //            .endpoint("localhost:3333")
             .build();
+    private static int initialTermId;
     private static long stopPosition;
     private static int termBufferLength;
     private static int mtuLength;

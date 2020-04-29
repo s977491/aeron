@@ -90,7 +90,9 @@ public class ReplicateRecordingTest
                 .maxCatalogEntries(MAX_CATALOG_ENTRIES)
                 .aeronDirectoryName(srcAeronDirectoryName)
                 .controlChannel(SRC_CONTROL_REQUEST_CHANNEL)
-                .archiveClientContext(new AeronArchive.Context().controlResponseChannel(SRC_CONTROL_RESPONSE_CHANNEL))
+                .archiveClientContext(
+                        new AeronArchive.Context().controlResponseChannel(SRC_CONTROL_RESPONSE_CHANNEL)
+                )
                 .recordingEventsEnabled(false)
                 .replicationChannel(SRC_REPLICATION_CHANNEL)
                 .deleteArchiveOnStart(true)

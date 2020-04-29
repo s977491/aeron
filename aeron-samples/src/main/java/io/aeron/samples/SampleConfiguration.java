@@ -26,10 +26,10 @@ public class SampleConfiguration
     public static final int SRC_CONTROL_STREAM_ID = AeronArchive.Configuration.CONTROL_STREAM_ID_DEFAULT;
     public static final String SRC_CONTROL_REQUEST_CHANNEL = "aeron:udp?endpoint=192.168.86.20:8090";
     public static final String SRC_CONTROL_RESPONSE_CHANNEL = "aeron:udp?endpoint=192.168.86.20:8091";
-    public static final String DST_CONTROL_REQUEST_CHANNEL = "aeron:udp?endpoint=192.168.86.239:8095";
-    public static final String DST_CONTROL_RESPONSE_CHANNEL = "aeron:udp?endpoint=192.168.86.239:8096";
+    public static final String DST_CONTROL_REQUEST_CHANNEL = "aeron:udp?endpoint=192.168.86.20:8095";
+    public static final String DST_CONTROL_RESPONSE_CHANNEL = "aeron:udp?endpoint=192.168.86.20:8096";
     public static final String SRC_REPLICATION_CHANNEL = "aeron:udp?endpoint=192.168.86.20:8040";
-    public static final String DST_REPLICATION_CHANNEL = "aeron:udp?endpoint=192.168.86.239:8041";
+    public static final String DST_REPLICATION_CHANNEL = "aeron:udp?endpoint=192.168.86.20:8041";
 
     public static final String CHANNEL_PROP = "aeron.sample.channel";
     public static final String STREAM_ID_PROP = "aeron.sample.streamId";

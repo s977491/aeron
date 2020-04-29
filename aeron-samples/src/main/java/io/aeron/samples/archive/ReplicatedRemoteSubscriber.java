@@ -40,6 +40,13 @@ import static io.aeron.samples.SampleConfiguration.dstAeronDirectoryName;
  */
 public class ReplicatedRemoteSubscriber
 {
+    private static int initialTermId;
+    private static long stopPosition;
+    private static int termBufferLength;
+    private static int mtuLength;
+    private static long recordingId;
+    private static int sessionId;
+
     private static final int STREAM_ID = SampleConfiguration.STREAM_ID;
 
     // Use a different stream id to avoid clash with live stream
@@ -69,29 +76,45 @@ public class ReplicatedRemoteSubscriber
 
         try (AeronArchive archive = AeronArchive.connect(archiveCtx))
         {
+
             final long recordingId = 0;
             final long position = 0L;
             final long length = Long.MAX_VALUE;
-            archive.replicate(
-                    recordingId, Aeron.NULL_VALUE, AeronArchive.Configuration.CONTROL_STREAM_ID_DEFAULT,
+            long replicatedId = archive.replicate(
+                    recordingId, NULL_VALUE, AeronArchive.Configuration.CONTROL_STREAM_ID_DEFAULT,
                     SRC_CONTROL_REQUEST_CHANNEL, null);
 
-            RecordingSignalMonitor recordingSignalMonitor = new RecordingSignalMonitor();
+            try {
+                RecordingSignalMonitor recordingSignalMonitor = new RecordingSignalMonitor();
 
-            recordingSignalMonitor.waitForSignal(archive, 1000);
-            System.out.println("Signal return: " + recordingSignalMonitor.getSignal());
-            recordingSignalMonitor.waitForSignal(archive, 1000);
-            System.out.println("Signal return: " + recordingSignalMonitor.getSignal());
-//            //assertEquals(RecordingSignal.REPLICATE, signalRef.get());
+                recordingSignalMonitor.waitForSignal(archive, 1000);
+                System.out.println("Signal return: " + recordingSignalMonitor.getSignal());
+                recordingSignalMonitor.waitForSignal(archive, 1000);
+                System.out.println("Signal return: " + recordingSignalMonitor.getSignal());
+                //            //assertEquals(RecordingSignal.REPLICATE, signalRef.get());
 
-            final long sessionId = archive.startReplay(recordingId, 0, AeronArchive.NULL_LENGTH, CHANNEL, REPLAY_STREAM_ID);
-            final String channel = ChannelUri.addSessionId(CHANNEL, (int)sessionId);
+                //load recording...
 
-            try (Subscription subscription = archive.context().aeron().addSubscription(channel, REPLAY_STREAM_ID))
-            {
-                SamplesUtil.subscriberLoop(fragmentHandler, FRAGMENT_COUNT_LIMIT, running).accept(subscription);
-                System.out.println("Shutting down...");
+
+
+                try (Subscription subscription = archive.context().aeron().addSubscription(
+                        SampleConfiguration.DST_REPLICATION_CHANNEL,
+                        REPLAY_STREAM_ID)) {
+                    SamplesUtil.subscriberLoop(fragmentHandler, FRAGMENT_COUNT_LIMIT, running).accept(subscription);
+                    System.out.println("Shutting down...");
+                }
+
+            } finally {
+                archive.stopReplication(replicatedId);
             }
+//            final long sessionId = archive.startReplay(recordingId, 0, AeronArchive.NULL_LENGTH, CHANNEL, REPLAY_STREAM_ID);
+//            final String channel = ChannelUri.addSessionId(CHANNEL, (int)sessionId);
+//
+//            try (Subscription subscription = archive.context().aeron().addSubscription(channel, REPLAY_STREAM_ID))
+//            {
+//                SamplesUtil.subscriberLoop(fragmentHandler, FRAGMENT_COUNT_LIMIT, running).accept(subscription);
+//                System.out.println("Shutting down...");
+//            }
         }
     }
 
@@ -140,5 +163,30 @@ public class ReplicatedRemoteSubscriber
         }
 
         return lastRecordingId.get();
+    }
+
+
+    private static int updateWithLatestRecording(String CHANNEL, AeronArchive archive) {
+        return findLatestRecording(archive, CHANNEL, STREAM_ID,
+                                   (controlSessionId, correlationId, recordingId, startTimestamp, stopTimestamp,
+                                    startPosition, stopPosition, initialTermId, segmentFileLength, termBufferLength,
+                                    mtuLength, sessionId, streamId, strippedChannel, originalChannel, sourceIdentity) -> {
+                                       if (ReplicatedRemoteSubscriber.stopPosition < stopPosition) {
+                                           ReplicatedRemoteSubscriber.initialTermId = initialTermId;
+                                           ReplicatedRemoteSubscriber.stopPosition = stopPosition;
+                                           ReplicatedRemoteSubscriber.termBufferLength = termBufferLength;
+                                           ReplicatedRemoteSubscriber.mtuLength = mtuLength;
+                                           ReplicatedRemoteSubscriber.recordingId = recordingId;
+                                           ReplicatedRemoteSubscriber.sessionId = sessionId;
+                                           System.out.println("sessionId:" + sessionId);
+
+                                       }
+                                   });
+    }
+    private static int findLatestRecording(final AeronArchive archive, String channel, int streamId, RecordingDescriptorConsumer consumer) {
+        final long fromRecordingId = 0L;
+        final int recordCount = 100;
+
+        return archive.listRecordingsForUri(fromRecordingId, recordCount, channel, streamId, consumer);
     }
 }

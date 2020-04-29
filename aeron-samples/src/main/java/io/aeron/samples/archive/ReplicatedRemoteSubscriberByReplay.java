@@ -17,9 +17,13 @@ package io.aeron.samples.archive;
 
 import io.aeron.Aeron;
 import io.aeron.ChannelUri;
+import io.aeron.ChannelUriStringBuilder;
 import io.aeron.Subscription;
 import io.aeron.archive.client.AeronArchive;
+import io.aeron.archive.client.ArchiveException;
+import io.aeron.archive.client.ControlResponsePoller;
 import io.aeron.archive.client.RecordingDescriptorConsumer;
+import io.aeron.archive.codecs.ControlResponseCode;
 import io.aeron.logbuffer.FragmentHandler;
 import io.aeron.samples.SampleConfiguration;
 import io.aeron.samples.SamplesUtil;
@@ -29,8 +33,7 @@ import org.agrona.concurrent.YieldingIdleStrategy;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static io.aeron.samples.SampleConfiguration.SRC_CONTROL_REQUEST_CHANNEL;
-import static io.aeron.samples.SampleConfiguration.dstAeronDirectoryName;
+import static io.aeron.samples.SampleConfiguration.*;
 
 /**
  * A basic subscriber application which requests a replay from the archive and consumes it.
@@ -44,6 +47,8 @@ public class ReplicatedRemoteSubscriberByReplay
 
     private static final String CHANNEL = SampleConfiguration.CHANNEL;
     private static final int FRAGMENT_COUNT_LIMIT = SampleConfiguration.FRAGMENT_COUNT_LIMIT;
+    private static long activeCorrelationId;
+
 
     public static void main(final String[] args)
     {
@@ -64,24 +69,65 @@ public class ReplicatedRemoteSubscriberByReplay
                 .controlResponseChannel(SampleConfiguration.DST_CONTROL_RESPONSE_CHANNEL)
                 .aeron(aeron);
 
+        AeronArchive.Context remoteArchiveCtx = new AeronArchive.Context()
+                .idleStrategy(YieldingIdleStrategy.INSTANCE)
+                .controlResponseChannel(DST_CONTROL_RESPONSE_CHANNEL)
+                .controlRequestChannel(SRC_CONTROL_REQUEST_CHANNEL)
+                .controlRequestStreamId(AeronArchive.Configuration.CONTROL_STREAM_ID_DEFAULT)
+                .aeron(aeron)
+                ;
+
         try (AeronArchive archive = AeronArchive.connect(archiveCtx))
         {
             final long recordingId = 0;
             final long position = 0L;
             final long length = Long.MAX_VALUE;
 
+//            AeronArchive.asyncConnect()
 //
-            archive.replicate(
-                    recordingId, Aeron.NULL_VALUE, AeronArchive.Configuration.CONTROL_STREAM_ID_DEFAULT,
-                    SRC_CONTROL_REQUEST_CHANNEL, null);
-
-            RecordingSignalMonitor recordingSignalMonitor = new RecordingSignalMonitor();
-
-            recordingSignalMonitor.waitForSignal(archive, 1000);
-            System.out.println("Signal return: " + recordingSignalMonitor.getSignal());
-            recordingSignalMonitor.waitForSignal(archive, 1000);
-            System.out.println("Signal return: " + recordingSignalMonitor.getSignal());
+//            archive.replicate(
+//                    recordingId, Aeron.NULL_VALUE, AeronArchive.Configuration.CONTROL_STREAM_ID_DEFAULT,
+//                    SRC_CONTROL_REQUEST_CHANNEL, null);
+//
+//            RecordingSignalMonitor recordingSignalMonitor = new RecordingSignalMonitor();
+//
+//            recordingSignalMonitor.waitForSignal(archive, 1000);
+//            System.out.println("Signal return: " + recordingSignalMonitor.getSignal());
+//            recordingSignalMonitor.waitForSignal(archive, 1000);
+//            System.out.println("Signal return: " + recordingSignalMonitor.getSignal());
             //assertEquals(RecordingSignal.REPLICATE, signalRef.get());
+
+            AeronArchive.AsyncConnect asyncConnect = AeronArchive.asyncConnect(remoteArchiveCtx);
+            AeronArchive remoteArchive;
+            while ( (remoteArchive = asyncConnect.poll()) == null) {
+                Thread.yield();
+            }
+            activeCorrelationId = aeron.nextCorrelationId();
+//            final ChannelUri channelUri
+            while (!remoteArchive.archiveProxy().replay(0, 0, AeronArchive.NULL_LENGTH,
+                                                        CHANNEL, REPLAY_STREAM_ID,
+                                                        activeCorrelationId, remoteArchive.controlSessionId())) {
+                Thread.yield();
+            }
+
+            final ControlResponsePoller poller = remoteArchive.controlResponsePoller();
+            poller.poll();
+
+            while(!hasResponse(remoteArchive, poller)) {
+                Thread.yield();
+            }
+            //EXTEND
+            final ChannelUri channelUri = ChannelUri.parse(DST_REPLICATION_CHANNEL);
+            final ChannelUriStringBuilder builder = new ChannelUriStringBuilder()
+                    .media(channelUri)
+                    .alias(channelUri)
+                    .rejoin(false)
+                    .sessionId((int)poller.relevantId());
+
+            builder.endpoint(channelUri);
+            String replicateChannel = builder.build();
+
+
 
             final long sessionId = archive.startReplay(recordingId, 0, AeronArchive.NULL_LENGTH, CHANNEL, REPLAY_STREAM_ID);
             final String channel = ChannelUri.addSessionId(CHANNEL, (int)sessionId);
@@ -92,6 +138,22 @@ public class ReplicatedRemoteSubscriberByReplay
                 System.out.println("Shutting down...");
             }
         }
+    }
+
+    private static boolean hasResponse(AeronArchive srcArchive, final ControlResponsePoller poller)
+    {
+        if (poller.isPollComplete() && poller.controlSessionId() == srcArchive.controlSessionId())
+        {
+            final ControlResponseCode code = poller.code();
+            if (ControlResponseCode.ERROR == code)
+            {
+                throw new ArchiveException(poller.errorMessage(), code.value());
+            }
+
+            return poller.correlationId() == activeCorrelationId && ControlResponseCode.OK == code;
+        }
+
+        return false;
     }
 
     private static FragmentHandler printStringMessage(int streamId) {
