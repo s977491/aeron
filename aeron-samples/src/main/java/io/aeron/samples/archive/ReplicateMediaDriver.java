@@ -33,6 +33,7 @@ public class ReplicateMediaDriver {
         try (ArchivingMediaDriver ignore = ArchivingMediaDriver.launch(
                 new MediaDriver.Context()
                         .aeronDirectoryName(SampleConfiguration.srcAeronDirectoryName)
+                        .publicationTermBufferLength(1 << 16)
                         .termBufferSparseFile(true)
                         .threadingMode(ThreadingMode.SHARED)
                         .errorHandler(ReplicateMediaDriver::onError)
@@ -47,6 +48,7 @@ public class ReplicateMediaDriver {
                         .deleteArchiveOnStart(true)
                         .archiveDir(new File(SystemUtil.tmpDirName(), "src-archive"))
                         .fileSyncLevel(0)
+                        .segmentFileLength(1 << 17)
                         .threadingMode(ArchiveThreadingMode.SHARED))) {
             System.out.println("Started");
             barrier.await();

@@ -16,12 +16,16 @@
 package io.aeron.samples.archive;
 
 import io.aeron.Aeron;
+import io.aeron.ChannelUriStringBuilder;
 import io.aeron.Publication;
 import io.aeron.archive.client.AeronArchive;
+import io.aeron.archive.client.ArchiveException;
+import io.aeron.archive.client.RecordingDescriptorConsumer;
 import io.aeron.archive.codecs.SourceLocation;
 import io.aeron.archive.status.RecordingPos;
 import io.aeron.samples.SampleConfiguration;
 import org.agrona.BufferUtil;
+import org.agrona.collections.MutableLong;
 import org.agrona.concurrent.IdleStrategy;
 import org.agrona.concurrent.SigInt;
 import org.agrona.concurrent.UnsafeBuffer;
@@ -31,6 +35,7 @@ import org.agrona.concurrent.status.CountersReader;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static io.aeron.archive.codecs.SourceLocation.LOCAL;
 import static io.aeron.samples.SampleConfiguration.srcAeronDirectoryName;
 
 /**
@@ -42,16 +47,29 @@ import static io.aeron.samples.SampleConfiguration.srcAeronDirectoryName;
  * setting their corresponding properties via the command-line; e.g.:
  * {@code -Daeron.sample.channel=aeron:udp?endpoint=localhost:5555 -Daeron.sample.streamId=20}
  */
-public class ReplicatedBasicPublisher
-{
+public class ReplicatedBasicPublisher {
     private static final int STREAM_ID = SampleConfiguration.STREAM_ID;
-    private static final String CHANNEL = SampleConfiguration.CHANNEL;
     private static final long NUMBER_OF_MESSAGES = SampleConfiguration.NUMBER_OF_MESSAGES;
 
     private static final UnsafeBuffer BUFFER = new UnsafeBuffer(BufferUtil.allocateDirectAligned(256, 64));
+    private static int initialTermId;
+    private static final ChannelUriStringBuilder RECORDED_CHANNEL_BUILDER = new ChannelUriStringBuilder()
+            .media("ipc");
+//            .endpoint("localhost:3333")
+//            .termLength(TERM_LENGTH);
 
-    public static void main(final String[] args) throws Exception
-    {
+    private static final String EXTEND_CHANNEL = new ChannelUriStringBuilder()
+            .media("ipc")
+//            .endpoint("localhost:3333")
+            .build();
+    private static long stopPosition;
+    private static int termBufferLength;
+    private static int mtuLength;
+    private static long recordingId;
+    private static int sessionId;
+
+    public static void main(final String[] args) throws Exception {
+        String CHANNEL = RECORDED_CHANNEL_BUILDER.build();
         System.out.println("Publishing to " + CHANNEL + " on stream id " + STREAM_ID);
 
         final AtomicBoolean running = new AtomicBoolean(true);
@@ -67,32 +85,60 @@ public class ReplicatedBasicPublisher
                 .controlResponseChannel(SampleConfiguration.SRC_CONTROL_RESPONSE_CHANNEL)
                 .aeron(aeron);
 
-        try (AeronArchive archive = AeronArchive.connect(archiveCtx))
-        {
-            archive.startRecording(CHANNEL, STREAM_ID, SourceLocation.LOCAL);
+        RecordingSignalMonitor recordingSignalMonitor = new RecordingSignalMonitor();
+        try (AeronArchive archive = AeronArchive.connect(archiveCtx)) {
 
-            try (Publication publication = archive.context().aeron().addPublication(CHANNEL, STREAM_ID))
-            {
+            long recordingSubId;
+
+            boolean newRecording = false;
+//            if (count > 0) {
+            final CountersReader counters = archive.context().aeron().countersReader();
+            int counterIdBySession = RecordingPos.findCounterIdBySession(counters, sessionId);
+            System.out.println("counterIdBySession:" + counterIdBySession);
+
+            int counterIdByRecordId = recordingSignalMonitor.getCounterIdByRecordId(archive, 0);
+            System.out.println("counterIdByRecordId:" + counterIdByRecordId);
+            ;
+            if (counterIdByRecordId != CountersReader.NULL_COUNTER_ID) {
+                while (RecordingPos.isActive(counters, counterIdByRecordId, 0)) {
+                    System.out.println("Waiting...");
+                    Thread.sleep(100);
+                }
+            }
+            int count = updateWithLatestRecording(CHANNEL, archive);
+            if (count > 0) {
+                System.out.println("extending");
+                CHANNEL = RECORDED_CHANNEL_BUILDER.initialPosition(stopPosition, initialTermId, termBufferLength)
+                                                  .mtu(mtuLength)
+                                                  .build();
+                recordingSubId = archive.extendRecording(recordingId, CHANNEL, STREAM_ID, LOCAL);
+
+            } else {
+                System.out.println("Start new recording!");
+                recordingSubId = archive.startRecording(CHANNEL, STREAM_ID, SourceLocation.LOCAL);
+                newRecording = true;
+            }
+
+            try (Publication publication = archive.context().aeron().addExclusivePublication(CHANNEL, STREAM_ID)) {
+                System.out.println("publisher session id:" + publication.sessionId());
                 final IdleStrategy idleStrategy = YieldingIdleStrategy.INSTANCE;
                 // Wait for recording to have started before publishing.
-                final CountersReader counters = archive.context().aeron().countersReader();
-                int counterId = RecordingPos.findCounterIdBySession(counters, publication.sessionId());
-                while (CountersReader.NULL_COUNTER_ID == counterId)
-                {
-                    if (!running.get())
-                    {
-                        return;
+                if (newRecording) {
+                    int counterId = RecordingPos.findCounterIdBySession(counters, publication.sessionId());
+                    while (CountersReader.NULL_COUNTER_ID == counterId) {
+                        if (!running.get()) {
+                            return;
+                        }
+
+                        idleStrategy.idle();
+                        counterId = RecordingPos.findCounterIdBySession(counters, publication.sessionId());
                     }
 
-                    idleStrategy.idle();
-                    counterId = RecordingPos.findCounterIdBySession(counters, publication.sessionId());
+                    recordingId = RecordingPos.getRecordingId(counters, counterId);
                 }
-
-                final long recordingId = RecordingPos.getRecordingId(counters, counterId);
                 System.out.println("Recording started: recordingId = " + recordingId);
-
-                for (int i = 0; i < NUMBER_OF_MESSAGES && running.get(); i++)
-                {
+                int i = 0;
+                for (; i < NUMBER_OF_MESSAGES * 1000 && running.get(); i++) {
                     final String message = "Hello World! " + i;
                     final byte[] messageBytes = message.getBytes();
                     BUFFER.putBytes(0, messageBytes);
@@ -103,63 +149,71 @@ public class ReplicatedBasicPublisher
                     checkResult(result);
 
                     final String errorMessage = archive.pollForErrorResponse();
-                    if (null != errorMessage)
-                    {
+                    if (null != errorMessage) {
                         throw new IllegalStateException(errorMessage);
                     }
 
-                    Thread.sleep(TimeUnit.SECONDS.toMillis(10));
+//                    Thread.sleep
+                    Thread.sleep(TimeUnit.SECONDS.toMillis(1));
                 }
+                System.out.print("Offering " + i + "/" + NUMBER_OF_MESSAGES + " - ");
 
                 idleStrategy.reset();
-                while (counters.getCounterValue(counterId) < publication.position())
-                {
-                    if (!RecordingPos.isActive(counters, counterId, recordingId))
-                    {
-                        throw new IllegalStateException("recording has stopped unexpectedly: " + recordingId);
-                    }
-
-                    idleStrategy.idle();
-                }
-            }
-            finally
-            {
+//                while (counters.getCounterValue(counterId) < publication.position()) {
+//                    if (!RecordingPos.isActive(counters, counterId, recordingId)) {
+//                        throw new IllegalStateException("recording has stopped unexpectedly: " + recordingId);
+//                    }
+//
+//                    idleStrategy.idle();
+//                }
+            } finally {
                 System.out.println("Done sending.");
-                archive.stopRecording(CHANNEL, STREAM_ID);
+                archive.stopRecording(recordingSubId);
             }
         }
     }
 
-    private static void checkResult(final long result)
-    {
-        if (result > 0)
-        {
+    private static int updateWithLatestRecording(String CHANNEL, AeronArchive archive) {
+        return findLatestRecording(archive, CHANNEL, STREAM_ID,
+                                   (controlSessionId, correlationId, recordingId, startTimestamp, stopTimestamp,
+                                    startPosition, stopPosition, initialTermId, segmentFileLength, termBufferLength,
+                                    mtuLength, sessionId, streamId, strippedChannel, originalChannel, sourceIdentity) -> {
+                                       if (ReplicatedBasicPublisher.stopPosition < stopPosition) {
+                                           ReplicatedBasicPublisher.initialTermId = initialTermId;
+                                           ReplicatedBasicPublisher.stopPosition = stopPosition;
+                                           ReplicatedBasicPublisher.termBufferLength = termBufferLength;
+                                           ReplicatedBasicPublisher.mtuLength = mtuLength;
+                                           ReplicatedBasicPublisher.recordingId = recordingId;
+                                           ReplicatedBasicPublisher.sessionId = sessionId;
+                                           System.out.println("sessionId:" + sessionId);
+
+                                       }
+                                   });
+    }
+
+    private static void checkResult(final long result) {
+        if (result > 0) {
             System.out.println("yay!");
-        }
-        else if (result == Publication.BACK_PRESSURED)
-        {
+        } else if (result == Publication.BACK_PRESSURED) {
             System.out.println("Offer failed due to back pressure");
-        }
-        else if (result == Publication.ADMIN_ACTION)
-        {
+        } else if (result == Publication.ADMIN_ACTION) {
             System.out.println("Offer failed because of an administration action in the system");
-        }
-        else if (result == Publication.NOT_CONNECTED)
-        {
+        } else if (result == Publication.NOT_CONNECTED) {
             System.out.println("Offer failed because publisher is not connected to subscriber");
-        }
-        else if (result == Publication.CLOSED)
-        {
+        } else if (result == Publication.CLOSED) {
             System.out.println("Offer failed publication is closed");
-        }
-        else if (result == Publication.MAX_POSITION_EXCEEDED)
-        {
+        } else if (result == Publication.MAX_POSITION_EXCEEDED) {
             throw new IllegalStateException("Offer failed due to publication reaching max position");
-        }
-        else
-        {
+        } else {
             System.out.println("Offer failed due to unknown result code: " + result);
         }
+    }
+
+    private static int findLatestRecording(final AeronArchive archive, String channel, int streamId, RecordingDescriptorConsumer consumer) {
+        final long fromRecordingId = 0L;
+        final int recordCount = 100;
+
+        return archive.listRecordingsForUri(fromRecordingId, recordCount, channel, streamId, consumer);
     }
 }
 

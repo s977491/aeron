@@ -57,6 +57,9 @@ public class RecordedBasicPublisher
 
         try (AeronArchive archive = AeronArchive.connect(archiveCtx))
         {
+
+
+
             archive.startRecording(CHANNEL, STREAM_ID, SourceLocation.LOCAL);
 
             try (Publication publication = archive.context().aeron().addPublication(CHANNEL, STREAM_ID))
@@ -104,7 +107,7 @@ public class RecordedBasicPublisher
                 {
                     if (!RecordingPos.isActive(counters, counterId, recordingId))
                     {
-                        throw new IllegalStateException("recording has stopped unexpectedly: " + recordingId);
+                        throw new IllegalStateException("recording has stopped unrecordingIdexpectedly: " + recordingId);
                     }
 
                     idleStrategy.idle();

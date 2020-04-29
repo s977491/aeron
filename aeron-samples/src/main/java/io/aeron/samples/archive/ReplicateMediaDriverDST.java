@@ -25,6 +25,7 @@ public class ReplicateMediaDriverDST {
         try (ArchivingMediaDriver ignore = ArchivingMediaDriver.launch(
                 new MediaDriver.Context()
                         .aeronDirectoryName(dstAeronDirectoryName)
+                        .publicationTermBufferLength(1 << 16)
                         .termBufferSparseFile(true)
                         .threadingMode(ThreadingMode.SHARED)
 //                        .errorHandler(Tests::onError)
@@ -39,6 +40,7 @@ public class ReplicateMediaDriverDST {
                         .deleteArchiveOnStart(true)
                         .archiveDir(new File(SystemUtil.tmpDirName(), "dst-archive"))
                         .fileSyncLevel(0)
+                        .segmentFileLength(1 << 17)
                         .threadingMode(ArchiveThreadingMode.DEDICATED))) {
             System.out.println("Started");
             barrier.await();
