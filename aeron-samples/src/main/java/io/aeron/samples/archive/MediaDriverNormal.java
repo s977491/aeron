@@ -12,10 +12,9 @@ import org.agrona.concurrent.ShutdownSignalBarrier;
 
 import java.io.File;
 
-import static io.aeron.CommonContext.generateRandomDirName;
 import static io.aeron.samples.SampleConfiguration.dstAeronDirectoryName;
 
-public class ReplicateMediaDriverDST {
+public class MediaDriverNormal {
 
     public static void main(String[] args) {
         final ShutdownSignalBarrier barrier = new ShutdownSignalBarrier();
@@ -24,23 +23,26 @@ public class ReplicateMediaDriverDST {
         ctx.terminationHook(barrier::signal);
         try (ArchivingMediaDriver ignore = ArchivingMediaDriver.launch(
                 new MediaDriver.Context()
-                        .aeronDirectoryName(dstAeronDirectoryName)
-                        .publicationTermBufferLength(1 << 16)
+//                        .aeronDirectoryName(dstAeronDirectoryName)
+//                        .publicationTermBufferLength(1 << 29)
+//                        .ipcPublicationTermWindowLength(1 << 29)
+//.ipcTermBufferLength(1 << 29)
+//                        .ipcTermBufferLength(1)
                         .termBufferSparseFile(true)
                         .threadingMode(ThreadingMode.SHARED)
 //                        .errorHandler(Tests::onError)
                         .spiesSimulateConnection(true)
                         .dirDeleteOnStart(true),
                 new Archive.Context()
-                        .aeronDirectoryName(dstAeronDirectoryName)
-                        .controlChannel(SampleConfiguration.DST_CONTROL_REQUEST_CHANNEL)
+//                        .aeronDirectoryName(dstAeronDirectoryName)
+//                        .controlChannel(SampleConfiguration.DST_CONTROL_REQUEST_CHANNEL)
 //                        .archiveClientContext(new AeronArchive.Context().controlResponseChannel(SampleConfiguration.DST_CONTROL_RESPONSE_CHANNEL))
-                        .recordingEventsEnabled(false)
-                        .replicationChannel(SampleConfiguration.DST_REPLICATION_CHANNEL)
+//                        .recordingEventsEnabled(false)
+//                        .replicationChannel(SampleConfiguration.DST_REPLICATION_CHANNEL)
                         .deleteArchiveOnStart(true)
-                        .archiveDir(new File(SystemUtil.tmpDirName(), "dst-archive"))
+                        .archiveDir(new File(SystemUtil.tmpDirName(), "normal-archive"))
                         .fileSyncLevel(0)
-                        .segmentFileLength(1 << 17)
+                        .segmentFileLength(1 << 30)
                         .threadingMode(ArchiveThreadingMode.DEDICATED))) {
             System.out.println("Started");
             barrier.await();

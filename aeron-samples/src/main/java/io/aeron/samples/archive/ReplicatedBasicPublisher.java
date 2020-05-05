@@ -88,6 +88,7 @@ public class ReplicatedBasicPublisher {
         RecordingSignalMonitor recordingSignalMonitor = new RecordingSignalMonitor();
         try (AeronArchive archive = AeronArchive.connect(archiveCtx)) {
 
+            archive.purgeSegments(0, 1 << 17);
             long recordingSubId;
 
             boolean newRecording = false;
@@ -148,7 +149,7 @@ public class ReplicatedBasicPublisher {
                     final byte[] messageBytes = message.getBytes();
                     BUFFER.putBytes(0, messageBytes);
 
-                    System.out.print("Offering " + i + "/" + NUMBER_OF_MESSAGES + " - ");
+                    System.out.print(publication.position() + "Offering " + i + "/" + NUMBER_OF_MESSAGES + " - ");
 
                     final long result = publication.offer(BUFFER, 0, messageBytes.length);
                     checkResult(result);
@@ -191,6 +192,7 @@ public class ReplicatedBasicPublisher {
                                            ReplicatedBasicPublisher.recordingId = recordingId;
                                            ReplicatedBasicPublisher.sessionId = sessionId;
                                            System.out.println("sessionId:" + sessionId);
+                                           System.out.println("streamId:" + streamId);
 
                                        }
                                    });

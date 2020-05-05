@@ -22,6 +22,8 @@ import org.agrona.BufferUtil;
 import org.agrona.CloseHelper;
 import org.agrona.concurrent.UnsafeBuffer;
 
+import java.util.concurrent.TimeUnit;
+
 /**
  * Basic Aeron publisher application.
  * <p>
@@ -63,15 +65,16 @@ public class BasicPublisher {
             for (long i = 0; i < NUMBER_OF_MESSAGES; i++) {
                 if (63 == (i & 0x1FF)) {
                     long thisTime = System.nanoTime();
-                    System.out.println("MPS" + ((0x1FF) * 1000000000L / (thisTime - lastTime)));
+//                    System.out.println("MPS" + ((0x1FF) * 1000000000L / (thisTime - lastTime)));
                     lastTime = thisTime;
                 }
 //                final String message = "Hello World! " + i;
 //                final byte[] messageBytes = message.getBytes();
                 BUFFER.putLong(0, System.nanoTime());
 //                System.out.print("Offering " + i + "/" + NUMBER_OF_MESSAGES + " - ");
-
+                System.out.println(publication.position());
                 final long result = publication.offer(BUFFER, 0, Long.BYTES);
+                System.out.println(publication.position());
 
                 if (result < 0L) {
                     if (result == Publication.BACK_PRESSURED) {
@@ -89,6 +92,7 @@ public class BasicPublisher {
                     } else {
                         System.out.println("Offer failed due to unknown reason: " + result);
                     }
+                    System.out.println(i+1 +":" + result);
                 } else {
 //                    System.out.println("yay!");
                 }
@@ -97,7 +101,7 @@ public class BasicPublisher {
                     System.out.println("No active subscribers detected");
                 }
 
-//                Thread.sleep(TimeUnit.SECONDS.toMillis(1));
+                Thread.sleep(TimeUnit.SECONDS.toMillis(3));
 //                Thread.sleep(1);
                 Thread.yield();
             }

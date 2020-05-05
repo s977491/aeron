@@ -41,30 +41,26 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * For an example that implements reassembly of large, fragmented messages, see
  * {@link MultipleSubscribersWithFragmentAssembly}.
  */
-public class BasicSubscriber
-{
+public class BasicSubscriberSlow {
     private static final int STREAM_ID = SampleConfiguration.STREAM_ID;
     private static final String CHANNEL = SampleConfiguration.CHANNEL;
     private static final int FRAGMENT_COUNT_LIMIT = SampleConfiguration.FRAGMENT_COUNT_LIMIT;
     private static final boolean EMBEDDED_MEDIA_DRIVER = SampleConfiguration.EMBEDDED_MEDIA_DRIVER;
     private static final Histogram HISTOGRAM = new Histogram(TimeUnit.SECONDS.toNanos(10), 3);
-    private static int sessionId;
 
-    public static void main(final String[] args)
-    {
+    public static void main(final String[] args) {
         System.out.println("Subscribing 2 to " + CHANNEL + " on stream id " + STREAM_ID);
 
         final MediaDriver driver = EMBEDDED_MEDIA_DRIVER ? MediaDriver.launchEmbedded() : null;
         final Aeron.Context ctx = new Aeron.Context()
-            .availableImageHandler(SamplesUtil::printAvailableImage)
-            .unavailableImageHandler(BasicSubscriber::unavail);
+                .availableImageHandler(SamplesUtil::printAvailableImage)
+                .unavailableImageHandler(BasicSubscriberSlow::unavail);
 
-        if (EMBEDDED_MEDIA_DRIVER)
-        {
+        if (EMBEDDED_MEDIA_DRIVER) {
             ctx.aeronDirectoryName(driver.aeronDirectoryName());
         }
 
-        final FragmentHandler fragmentHandler = BasicSubscriber::handler;
+        final FragmentHandler fragmentHandler = BasicSubscriberSlow::handler;
         final AtomicBoolean running = new AtomicBoolean(true);
 
         // Register a SIGINT handler for graceful shutdown.
@@ -77,27 +73,9 @@ public class BasicSubscriber
         // clean up resources when this try block is finished
         HISTOGRAM.reset();
         try (Aeron aeron = Aeron.connect(ctx);
-            Subscription subscription = aeron.addSubscription(CHANNEL, STREAM_ID))
-        {
-//            SamplesUtil.subscriberLoop(fragmentHandler, FRAGMENT_COUNT_LIMIT, running).accept(subscription);
+             Subscription subscription = aeron.addSubscription(CHANNEL, STREAM_ID)) {
+            SamplesUtil.subscriberLoop(fragmentHandler, FRAGMENT_COUNT_LIMIT, running).accept(subscription);
 
-            while (running.get())
-            {
-
-                final int fragmentsRead = subscription.poll(fragmentHandler, 10);
-                if (fragmentsRead > 0) {
-                    Image image = subscription.imageBySessionId(sessionId);
-
-                    if (image != null) {
-                        System.out.println("Image pos:" + image.position());
-                    }
-                }
-                try {
-                    Thread.sleep(1);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
             System.out.println("Shutting down...");
         }
 
@@ -111,18 +89,33 @@ public class BasicSubscriber
 
     }
 
+    private static boolean slept = false;
+
+    private static long startIndex;
+
     private static void handler(DirectBuffer directBuffer, int i, int len, Header header) {
         SamplesUtil.test(1);
-        sessionId = header.sessionId();
-        System.out.println(header.position());
 //        SamplesUtil.printStringMessage(STREAM_ID);
         long start = directBuffer.getLong(i);
+
         long end = System.nanoTime();
         if (start > end ) {
             System.out.println("Start:" + start + ", end" + end);
         }
         else {
+            if (i > 10000) {
+                try {
+                    if (!slept) {
+                        Thread.sleep(1000);
+                        slept = true;
+                        System.out.println("Sleep ..");
+                    }
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
             HISTOGRAM.recordValue(end - start);
+
         }
     }
 }

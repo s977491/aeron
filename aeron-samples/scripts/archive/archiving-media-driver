@@ -24,5 +24,5 @@ ${JAVA_HOME}/bin/java \
     -XX:+TrustFinalNonStaticFields \
     -XX:+UnlockDiagnosticVMOptions \
     -XX:GuaranteedSafepointInterval=300000 \
-    -XX:+UseParallelOldGC \
+    -XX:+UseParallelOldGC -Daeron.spies.simulate.connection=true \
     ${JVM_OPTS} io.aeron.archive.ArchivingMediaDriver "$@"
