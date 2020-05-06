@@ -22,6 +22,7 @@ import io.aeron.archive.codecs.RecordingSignal;
 import io.aeron.logbuffer.FragmentHandler;
 import io.aeron.samples.SampleConfiguration;
 import io.aeron.samples.SamplesUtil;
+import org.agrona.CloseHelper;
 import org.agrona.collections.MutableLong;
 import org.agrona.collections.MutableReference;
 import org.agrona.concurrent.SigInt;
@@ -36,8 +37,7 @@ import static io.aeron.samples.SampleConfiguration.dstAeronDirectoryName;
 /**
  * A basic subscriber application which requests a replay from the archive and consumes it.
  */
-public class ReplicatedRemoteSubscriber
-{
+public class ReplicatedRemoteSubscriber {
     private static int initialTermId;
     private static long stopPosition;
     private static int termBufferLength;
@@ -53,8 +53,7 @@ public class ReplicatedRemoteSubscriber
     private static final String CHANNEL = SampleConfiguration.CHANNEL;
     private static final int FRAGMENT_COUNT_LIMIT = SampleConfiguration.FRAGMENT_COUNT_LIMIT;
 
-    public static void main(final String[] args)
-    {
+    public static void main(final String[] args) {
         System.out.println("Subscribing to " + CHANNEL + " on stream id " + STREAM_ID);
 
         final FragmentHandler fragmentHandler = printStringMessage(STREAM_ID);
@@ -62,42 +61,41 @@ public class ReplicatedRemoteSubscriber
 
         SigInt.register(() -> running.set(false));
 
-        Aeron aeron = Aeron.connect(
-                new Aeron.Context().aeronDirectoryName(dstAeronDirectoryName));
+        try (Aeron aeron = Aeron.connect(
+                new Aeron.Context().aeronDirectoryName(dstAeronDirectoryName))) {
 
-        // Create a unique response stream id so not to clash with other archive clients.
-        final AeronArchive.Context archiveCtx = new AeronArchive.Context()
-                .idleStrategy(YieldingIdleStrategy.INSTANCE)
-                .controlRequestChannel(SampleConfiguration.DST_CONTROL_REQUEST_CHANNEL)
-                .controlResponseChannel(SampleConfiguration.DST_CONTROL_RESPONSE_CHANNEL)
-                .aeron(aeron);
+            // Create a unique response stream id so not to clash with other archive clients.
+            final AeronArchive.Context archiveCtx = new AeronArchive.Context()
+                    .idleStrategy(YieldingIdleStrategy.INSTANCE)
+                    .controlRequestChannel(SampleConfiguration.DST_CONTROL_REQUEST_CHANNEL)
+                    .controlResponseChannel(SampleConfiguration.DST_CONTROL_RESPONSE_CHANNEL)
+                    .aeron(aeron);
 
-        try (AeronArchive archive = AeronArchive.connect(archiveCtx))
-        {
+            try (AeronArchive archive = AeronArchive.connect(archiveCtx)) {
 
-            final long recordingId = 0;
-            final long position = 0L;
-            final long length = Long.MAX_VALUE;
-            long replicatedId = archive.replicate(
-                    recordingId, NULL_VALUE, AeronArchive.Configuration.CONTROL_STREAM_ID_DEFAULT,
-                    SRC_CONTROL_REQUEST_CHANNEL, null);
+                final long recordingId = 0;
+                final long position = 0L;
+                final long length = Long.MAX_VALUE;
+                long replicatedId = archive.replicate(
+                        recordingId, NULL_VALUE, AeronArchive.Configuration.CONTROL_STREAM_ID_DEFAULT,
+                        SRC_CONTROL_REQUEST_CHANNEL, null);
 
-            try {
-                RecordingSignalMonitor recordingSignalMonitor = new RecordingSignalMonitor();
+                try {
+                    RecordingSignalMonitor recordingSignalMonitor = new RecordingSignalMonitor();
 
-                recordingSignalMonitor.waitForSignal(archive, 1000);
-                System.out.println("Signal return: " + recordingSignalMonitor.getSignal());
-                recordingSignalMonitor.waitForSignal(archive, 1000);
-                System.out.println("Signal return: " + recordingSignalMonitor.getSignal());
-                //            //assertEquals(RecordingSignal.REPLICATE, signalRef.get());
+                    recordingSignalMonitor.waitForSignal(archive, 1000);
+                    System.out.println("Signal return: " + recordingSignalMonitor.getSignal());
+                    recordingSignalMonitor.waitForSignal(archive, 1000);
+                    System.out.println("Signal return: " + recordingSignalMonitor.getSignal());
+                    //            //assertEquals(RecordingSignal.REPLICATE, signalRef.get());
 
-                updateWithLatestRecording(SampleConfiguration.DST_REPLICATION_CHANNEL, REPLAY_STREAM_ID, archive);
+                    updateWithLatestRecording(SampleConfiguration.DST_REPLICATION_CHANNEL, REPLAY_STREAM_ID, archive);
 
-                //load recording...
-                String subscriptionChannel = new ChannelUriStringBuilder()
-                        .media(CommonContext.UDP_MEDIA)
-                        .controlMode(CommonContext.MDC_CONTROL_MODE_MANUAL)
-                        .sessionId(sessionId).build();
+                    //load recording...
+                    String subscriptionChannel = new ChannelUriStringBuilder()
+                            .media(CommonContext.UDP_MEDIA)
+                            .controlMode(CommonContext.MDC_CONTROL_MODE_MANUAL)
+                            .sessionId(sessionId).build();
 
 //                try (Subscription subscription = aeron.addSubscription(subscriptionChannel, STREAM_ID);
 //                     ReplayMerge replayMerge = new ReplayMerge(
@@ -148,19 +146,17 @@ public class ReplicatedRemoteSubscriber
 //
 
 
+                    try (Subscription subscription = archive.context().aeron().addSubscription(
+                            SampleConfiguration.DST_REPLICATION_CHANNEL,
+                            REPLAY_STREAM_ID)) {
+                        SamplesUtil.subscriberLoop(fragmentHandler, FRAGMENT_COUNT_LIMIT, running).accept(subscription);
+                        System.out.println("Shutting down...");
+                    }
 
+                } finally {
+                    archive.stopReplication(replicatedId);
 
-
-                try (Subscription subscription = archive.context().aeron().addSubscription(
-                        SampleConfiguration.DST_REPLICATION_CHANNEL,
-                        REPLAY_STREAM_ID)) {
-                    SamplesUtil.subscriberLoop(fragmentHandler, FRAGMENT_COUNT_LIMIT, running).accept(subscription);
-                    System.out.println("Shutting down...");
                 }
-
-            } finally {
-                archive.stopReplication(replicatedId);
-            }
 //            final long sessionId = archive.startReplay(recordingId, 0, AeronArchive.NULL_LENGTH, CHANNEL, REPLAY_STREAM_ID);
 //            final String channel = ChannelUri.addSessionId(CHANNEL, (int)sessionId);
 //
@@ -169,50 +165,49 @@ public class ReplicatedRemoteSubscriber
 //                SamplesUtil.subscriberLoop(fragmentHandler, FRAGMENT_COUNT_LIMIT, running).accept(subscription);
 //                System.out.println("Shutting down...");
 //            }
+            }
         }
     }
 
     private static FragmentHandler printStringMessage(int streamId) {
-            return (buffer, offset, length, header) ->
-            {
-                final byte[] data = new byte[length];
-                buffer.getBytes(offset, data);
+        return (buffer, offset, length, header) ->
+        {
+            final byte[] data = new byte[length];
+            buffer.getBytes(offset, data);
 
-                System.out.println(String.format(
-                        "Message to stream %d from session %d (%d@%d) <<%s>>",
-                        streamId, header.sessionId(), length, offset, new String(data)));
-            };
+            System.out.println(String.format(
+                    "Message to stream %d from session %d (%d@%d) <<%s>>",
+                    streamId, header.sessionId(), length, offset, new String(data)));
+        };
     }
 
-    private static long findLatestRecording(final AeronArchive archive)
-    {
+    private static long findLatestRecording(final AeronArchive archive) {
         final MutableLong lastRecordingId = new MutableLong();
 
         final RecordingDescriptorConsumer consumer =
-            (controlSessionId,
-            correlationId,
-            recordingId,
-            startTimestamp,
-            stopTimestamp,
-            startPosition,
-            stopPosition,
-            initialTermId,
-            segmentFileLength,
-            termBufferLength,
-            mtuLength,
-            sessionId,
-            streamId,
-            strippedChannel,
-            originalChannel,
-            sourceIdentity) -> lastRecordingId.set(recordingId);
+                (controlSessionId,
+                 correlationId,
+                 recordingId,
+                 startTimestamp,
+                 stopTimestamp,
+                 startPosition,
+                 stopPosition,
+                 initialTermId,
+                 segmentFileLength,
+                 termBufferLength,
+                 mtuLength,
+                 sessionId,
+                 streamId,
+                 strippedChannel,
+                 originalChannel,
+                 sourceIdentity) -> lastRecordingId.set(recordingId);
 
         final long fromRecordingId = 0L;
         final int recordCount = 100;
 
         final int foundCount = archive.listRecordingsForUri(fromRecordingId, recordCount, CHANNEL, STREAM_ID, consumer);
 
-        if (foundCount == 0)
-        {
+        if (foundCount == 0) {
             throw new IllegalStateException("no recordings found");
         }
 
@@ -237,6 +232,7 @@ public class ReplicatedRemoteSubscriber
                                        }
                                    });
     }
+
     private static int findLatestRecording(final AeronArchive archive, String channel, int streamId, RecordingDescriptorConsumer consumer) {
         final long fromRecordingId = 0L;
         final int recordCount = 100;

@@ -25,6 +25,7 @@ import io.aeron.archive.codecs.SourceLocation;
 import io.aeron.archive.status.RecordingPos;
 import io.aeron.samples.SampleConfiguration;
 import org.agrona.BufferUtil;
+import org.agrona.CloseHelper;
 import org.agrona.collections.MutableLong;
 import org.agrona.concurrent.IdleStrategy;
 import org.agrona.concurrent.SigInt;
@@ -75,97 +76,97 @@ public class ReplicatedBasicPublisher {
         final AtomicBoolean running = new AtomicBoolean(true);
         SigInt.register(() -> running.set(false));
 
-        Aeron aeron = Aeron.connect(
+        try (Aeron aeron = Aeron.connect(
                 new Aeron.Context()
-                        .aeronDirectoryName(srcAeronDirectoryName));
+                        .aeronDirectoryName(srcAeronDirectoryName))) {
+            // Create a unique response stream id so not to clash with other archive clients.
+            final AeronArchive.Context archiveCtx = new AeronArchive.Context()
+                    .idleStrategy(YieldingIdleStrategy.INSTANCE)
+                    .controlRequestChannel(SampleConfiguration.SRC_CONTROL_REQUEST_CHANNEL)
+                    .controlResponseChannel(SampleConfiguration.SRC_CONTROL_RESPONSE_CHANNEL)
+                    .aeron(aeron);
+            RecordingSignalMonitor recordingSignalMonitor = new RecordingSignalMonitor();
+            try (AeronArchive archive = AeronArchive.connect(archiveCtx)) {
 
-        // Create a unique response stream id so not to clash with other archive clients.
-        final AeronArchive.Context archiveCtx = new AeronArchive.Context()
-                .idleStrategy(YieldingIdleStrategy.INSTANCE)
-                .controlRequestChannel(SampleConfiguration.SRC_CONTROL_REQUEST_CHANNEL)
-                .controlResponseChannel(SampleConfiguration.SRC_CONTROL_RESPONSE_CHANNEL)
-                .aeron(aeron);
-        RecordingSignalMonitor recordingSignalMonitor = new RecordingSignalMonitor();
-        try (AeronArchive archive = AeronArchive.connect(archiveCtx)) {
 
 //            archive.purgeSegments(0, 1 << 17);
-            long recordingSubId;
+                long recordingSubId;
 
-            boolean newRecording = false;
+                boolean newRecording = false;
 //            if (count > 0) {
-            final CountersReader counters = archive.context().aeron().countersReader();
-            int counterIdBySession = RecordingPos.findCounterIdBySession(counters, sessionId);
-            System.out.println("counterIdBySession:" + counterIdBySession);
+                final CountersReader counters = archive.context().aeron().countersReader();
+                int counterIdBySession = RecordingPos.findCounterIdBySession(counters, sessionId);
+                System.out.println("counterIdBySession:" + counterIdBySession);
 
-            int counterIdByRecordId = recordingSignalMonitor.getCounterIdByRecordId(archive, 0);
-            System.out.println("counterIdByRecordId:" + counterIdByRecordId);
-            ;
-            if (counterIdByRecordId != CountersReader.NULL_COUNTER_ID) {
-                while (RecordingPos.isActive(counters, counterIdByRecordId, 0)) {
-                    System.out.println("Waiting...");
-                    Thread.sleep(100);
+                int counterIdByRecordId = recordingSignalMonitor.getCounterIdByRecordId(archive, 0);
+                System.out.println("counterIdByRecordId:" + counterIdByRecordId);
+                ;
+                if (counterIdByRecordId != CountersReader.NULL_COUNTER_ID) {
+                    while (RecordingPos.isActive(counters, counterIdByRecordId, 0)) {
+                        System.out.println("Waiting...");
+                        Thread.sleep(100);
+                    }
                 }
-            }
-            int count = updateWithLatestRecording(CHANNEL, archive);
-            if (count > 0) {
-                System.out.println("extending");
-                CHANNEL = RECORDED_CHANNEL_BUILDER.sessionId(sessionId).initialPosition(stopPosition, initialTermId, termBufferLength)
-                                                  .mtu(mtuLength)
-                                                  .build();
-                try {
-                    recordingSubId = archive.extendRecording(recordingId, CHANNEL, STREAM_ID, LOCAL);
-                } catch (Exception e) {
-                    //already replicated... just go on.
-                    System.out.println("Already replicating, may just continue publish ");
+                int count = updateWithLatestRecording(CHANNEL, archive);
+                if (count > 0) {
+                    System.out.println("extending");
+                    CHANNEL = RECORDED_CHANNEL_BUILDER.sessionId(sessionId).initialPosition(stopPosition, initialTermId, termBufferLength)
+                                                      .mtu(mtuLength)
+                                                      .build();
+                    try {
+                        recordingSubId = archive.extendRecording(recordingId, CHANNEL, STREAM_ID, LOCAL);
+                    } catch (Exception e) {
+                        //already replicated... just go on.
+                        System.out.println("Already replicating, may just continue publish ");
+                    }
+
+                } else {
+                    System.out.println("Start new recording!");
+                    recordingSubId = archive.startRecording(CHANNEL, STREAM_ID, SourceLocation.REMOTE, true);
+                    newRecording = true;
                 }
 
-            } else {
-                System.out.println("Start new recording!");
-                recordingSubId = archive.startRecording(CHANNEL, STREAM_ID, SourceLocation.REMOTE, true);
-                newRecording = true;
-            }
+                try (Publication publication = archive.context().aeron().addExclusivePublication(CHANNEL, STREAM_ID)) {
+                    System.out.println("publisher session id:" + publication.sessionId());
+                    final IdleStrategy idleStrategy = YieldingIdleStrategy.INSTANCE;
+                    // Wait for recording to have started before publishing.
+                    if (newRecording) {
+                        int counterId = RecordingPos.findCounterIdBySession(counters, publication.sessionId());
+                        while (CountersReader.NULL_COUNTER_ID == counterId) {
+                            if (!running.get()) {
+                                return;
+                            }
 
-            try (Publication publication = archive.context().aeron().addExclusivePublication(CHANNEL, STREAM_ID)) {
-                System.out.println("publisher session id:" + publication.sessionId());
-                final IdleStrategy idleStrategy = YieldingIdleStrategy.INSTANCE;
-                // Wait for recording to have started before publishing.
-                if (newRecording) {
-                    int counterId = RecordingPos.findCounterIdBySession(counters, publication.sessionId());
-                    while (CountersReader.NULL_COUNTER_ID == counterId) {
-                        if (!running.get()) {
-                            return;
+                            idleStrategy.idle();
+                            counterId = RecordingPos.findCounterIdBySession(counters, publication.sessionId());
                         }
 
-                        idleStrategy.idle();
-                        counterId = RecordingPos.findCounterIdBySession(counters, publication.sessionId());
+                        recordingId = RecordingPos.getRecordingId(counters, counterId);
                     }
+                    System.out.println("Recording started: recordingId = " + recordingId);
+                    int i = 0;
+                    for (; i < NUMBER_OF_MESSAGES * 1000 && running.get(); i++) {
+                        final String message = "Hello World! " + i;
+                        final byte[] messageBytes = message.getBytes();
+                        BUFFER.putBytes(0, messageBytes);
 
-                    recordingId = RecordingPos.getRecordingId(counters, counterId);
-                }
-                System.out.println("Recording started: recordingId = " + recordingId);
-                int i = 0;
-                for (; i < NUMBER_OF_MESSAGES * 1000 && running.get(); i++) {
-                    final String message = "Hello World! " + i;
-                    final byte[] messageBytes = message.getBytes();
-                    BUFFER.putBytes(0, messageBytes);
+                        System.out.print(publication.position() + "Offering " + i + "/" + NUMBER_OF_MESSAGES + " - ");
 
-                    System.out.print(publication.position() + "Offering " + i + "/" + NUMBER_OF_MESSAGES + " - ");
+                        final long result = publication.offer(BUFFER, 0, messageBytes.length);
+                        checkResult(result);
 
-                    final long result = publication.offer(BUFFER, 0, messageBytes.length);
-                    checkResult(result);
-
-                    final String errorMessage = archive.pollForErrorResponse();
-                    if (null != errorMessage) {
-                        throw new IllegalStateException(errorMessage);
-                    }
+                        final String errorMessage = archive.pollForErrorResponse();
+                        if (null != errorMessage) {
+                            throw new IllegalStateException(errorMessage);
+                        }
 
 //                    Thread.sleep
 //                    Thread.sleep(TimeUnit.SECONDS.toMillis(1));
-                    Thread.sleep(1);
-                }
-                System.out.print("Offering " + i + "/" + NUMBER_OF_MESSAGES + " - ");
+                        Thread.sleep(1);
+                    }
+                    System.out.print("Offering " + i + "/" + NUMBER_OF_MESSAGES + " - ");
 
-                idleStrategy.reset();
+                    idleStrategy.reset();
 //                while (counters.getCounterValue(counterId) < publication.position()) {
 //                    if (!RecordingPos.isActive(counters, counterId, recordingId)) {
 //                        throw new IllegalStateException("recording has stopped unexpectedly: " + recordingId);
@@ -173,10 +174,12 @@ public class ReplicatedBasicPublisher {
 //
 //                    idleStrategy.idle();
 //                }
-            } finally {
-                System.out.println("Done sending.");
-                archive.stopRecording(CHANNEL, STREAM_ID);
+                } finally {
+                    System.out.println("Done sending.");
+                    archive.stopRecording(CHANNEL, STREAM_ID);
+                }
             }
+
         }
     }
 
