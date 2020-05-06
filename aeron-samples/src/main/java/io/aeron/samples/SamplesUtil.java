@@ -107,17 +107,17 @@ public class SamplesUtil
     private static int count;
     public static FragmentHandler printStringMessage(final int streamId)
     {
-        return (buffer, offset, length, headecountr) ->
+        return (buffer, offset, length, header) ->
         {
             if (count++ == 0) {
                 startTime = System.nanoTime();
             }
-//            final byte[] data = new byte[length];
-//            buffer.getBytes(offset, data);
+            final byte[] data = new byte[length];
+            buffer.getBytes(offset, data);
 
-//            System.out.println(String.format(
-//                "Message to stream %d from session %d (%d@%d) <<%s>>",
-//                streamId, header.sessionId(), length, offset, new String(data)));
+            System.out.println(String.format(
+                "Message to stream %d from session %d (%d@%d) <<%s>>",
+                streamId, header.sessionId(), length, offset, new String(data)));
         };
     }
     public static void test(final int streamId)

@@ -76,7 +76,8 @@ public class ReplicatedBasicPublisher {
         SigInt.register(() -> running.set(false));
 
         Aeron aeron = Aeron.connect(
-                new Aeron.Context().aeronDirectoryName(srcAeronDirectoryName));
+                new Aeron.Context()
+                        .aeronDirectoryName(srcAeronDirectoryName));
 
         // Create a unique response stream id so not to clash with other archive clients.
         final AeronArchive.Context archiveCtx = new AeronArchive.Context()
@@ -84,11 +85,10 @@ public class ReplicatedBasicPublisher {
                 .controlRequestChannel(SampleConfiguration.SRC_CONTROL_REQUEST_CHANNEL)
                 .controlResponseChannel(SampleConfiguration.SRC_CONTROL_RESPONSE_CHANNEL)
                 .aeron(aeron);
-
         RecordingSignalMonitor recordingSignalMonitor = new RecordingSignalMonitor();
         try (AeronArchive archive = AeronArchive.connect(archiveCtx)) {
 
-            archive.purgeSegments(0, 1 << 17);
+//            archive.purgeSegments(0, 1 << 17);
             long recordingSubId;
 
             boolean newRecording = false;
@@ -160,7 +160,8 @@ public class ReplicatedBasicPublisher {
                     }
 
 //                    Thread.sleep
-                    Thread.sleep(TimeUnit.SECONDS.toMillis(1));
+//                    Thread.sleep(TimeUnit.SECONDS.toMillis(1));
+                    Thread.sleep(1);
                 }
                 System.out.print("Offering " + i + "/" + NUMBER_OF_MESSAGES + " - ");
 
@@ -193,6 +194,11 @@ public class ReplicatedBasicPublisher {
                                            ReplicatedBasicPublisher.sessionId = sessionId;
                                            System.out.println("sessionId:" + sessionId);
                                            System.out.println("streamId:" + streamId);
+                                           System.out.println("recordingId:" + recordingId);
+                                           System.out.println("startPosition:" + startPosition);
+                                           System.out.println("stopPosition:" + stopPosition);
+                                           System.out.println("originalChannel:" + originalChannel);
+                                           System.out.println("sourceIdentity:" + sourceIdentity);
 
                                        }
                                    });

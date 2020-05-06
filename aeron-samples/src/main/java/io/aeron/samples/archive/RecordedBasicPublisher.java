@@ -99,7 +99,7 @@ public class RecordedBasicPublisher
                         throw new IllegalStateException(errorMessage);
                     }
 
-                    Thread.sleep(TimeUnit.SECONDS.toMillis(1));
+                    Thread.sleep(1);
                 }
 
                 idleStrategy.reset();

@@ -101,7 +101,7 @@ public class BasicPublisher {
                     System.out.println("No active subscribers detected");
                 }
 
-                Thread.sleep(TimeUnit.SECONDS.toMillis(3));
+//                Thread.sleep(TimeUnit.SECONDS.toMillis(3));
 //                Thread.sleep(1);
                 Thread.yield();
             }

@@ -55,10 +55,11 @@ public class ReplayedBasicSubscriber
 
         try (AeronArchive archive = AeronArchive.connect(archiveCtx))
         {
-            final long recordingId = findLatestRecording(archive);
+            final long recordingId = 0;//findLatestRecording(archive);
             final long position = 0L;
-            final long length = Long.MAX_VALUE;
-
+            final long length = AeronArchive.NULL_LENGTH;
+            System.out.println(archive.getStopPosition(0));
+            System.out.println(archive.getRecordingPosition(0));
             final long sessionId = archive.startReplay(recordingId, position, length, CHANNEL, REPLAY_STREAM_ID);
             final String channel = ChannelUri.addSessionId(CHANNEL, (int)sessionId);
 

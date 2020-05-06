@@ -79,6 +79,8 @@ public final class CncFileReader implements AutoCloseable
     public static CncFileReader map()
     {
         final File cncFile = CommonContext.newDefaultCncFile();
+        System.out.println(cncFile.getAbsolutePath());
+//        File cncFile = new File("/home/arthurlcc/tmp/ArthurSrcAeronDirectoryName/cnc.dat");
         final MappedByteBuffer cncByteBuffer = mapExistingFileReadOnly(cncFile);
 
         return new CncFileReader(cncByteBuffer);

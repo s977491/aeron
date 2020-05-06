@@ -26,7 +26,7 @@ public class MediaDriverNormal {
 //                        .aeronDirectoryName(dstAeronDirectoryName)
 //                        .publicationTermBufferLength(1 << 29)
 //                        .ipcPublicationTermWindowLength(1 << 29)
-//.ipcTermBufferLength(1 << 29)
+.ipcTermBufferLength(1 << 16)
 //                        .ipcTermBufferLength(1)
                         .termBufferSparseFile(true)
                         .threadingMode(ThreadingMode.SHARED)
@@ -42,7 +42,7 @@ public class MediaDriverNormal {
                         .deleteArchiveOnStart(true)
                         .archiveDir(new File(SystemUtil.tmpDirName(), "normal-archive"))
                         .fileSyncLevel(0)
-                        .segmentFileLength(1 << 30)
+                        .segmentFileLength(1 << 17)
                         .threadingMode(ArchiveThreadingMode.DEDICATED))) {
             System.out.println("Started");
             barrier.await();
