@@ -56,7 +56,6 @@ public class ReplicatedBasicSubscriber
         Aeron aeron = Aeron.connect(
                 new Aeron.Context().aeronDirectoryName(srcAeronDirectoryName));
 
-
         // Create a unique response stream id so not to clash with other archive clients.
         final AeronArchive.Context archiveCtx = new AeronArchive.Context()
                 .idleStrategy(YieldingIdleStrategy.INSTANCE)
@@ -66,50 +65,20 @@ public class ReplicatedBasicSubscriber
 
         try (AeronArchive archive = AeronArchive.connect(archiveCtx))
         {
-            RecordingInfoFinder recordingInfoFinder = new RecordingInfoFinder();
             final long recordingId = findLatestRecording(archive);
-            recordingInfoFinder.listRecordingForLatestInfo(archive, 0);
-            System.out.println(recordingInfoFinder.toString());
             final long position = 0L;
             final long length = Long.MAX_VALUE;
 
+            final long sessionId = archive.startReplay(recordingId, position, length, CHANNEL, REPLAY_STREAM_ID);
+            final String channel = ChannelUri.addSessionId(CHANNEL, (int)sessionId);
 
-            try (Subscription subscription = archive.replay(recordingId,
-                                                            1177792 - 65,
-                                                            65 ,
-                                                            CHANNEL,
-                                                            REPLAY_STREAM_ID)) {
-                while (subscription.imageCount() == 0) {
-                    subscription.poll(fragmentHandler, 10);
-                    Thread.yield();
-                }
-                long currentPosition = subscription.imageAtIndex(0).position();
-                System.out.println("currentPos" + currentPosition);
-                while (currentPosition < 1177792) {
-                    subscription.poll(fragmentHandler, 10);
-                    long newPosition = subscription.imageAtIndex(0).position();
-                    if (newPosition != currentPosition) {
-                        currentPosition = newPosition;
-                    } else {
-                        Thread.yield();
-                    }
-                }
-                ;
+            try (Subscription subscription = archive.context().aeron().addSubscription(channel, REPLAY_STREAM_ID))
+            {
+                SamplesUtil.subscriberLoop(fragmentHandler, FRAGMENT_COUNT_LIMIT, running).accept(subscription);
+                System.out.println("Shutting down...");
             }
-
-//
-//
-//
-//            final long sessionId = archive.startReplay(recordingId, position, length, CHANNEL, REPLAY_STREAM_ID);
-//            final String channel = ChannelUri.addSessionId(CHANNEL, (int)sessionId);
-//
-//            try (Subscription subscription = archive.context().aeron().addSubscription(channel, REPLAY_STREAM_ID))
-//            {
-//                SamplesUtil.subscriberLoop(fragmentHandler, FRAGMENT_COUNT_LIMIT, running).accept(subscription);
-//                System.out.println("Shutting down...");
-//            }
         }
-    }//1177792
+    }
 
     private static FragmentHandler printStringMessage(int streamId) {
             return (buffer, offset, length, header) ->
