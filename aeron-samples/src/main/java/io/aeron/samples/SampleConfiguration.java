@@ -24,12 +24,12 @@ import org.agrona.concurrent.IdleStrategy;
 public class SampleConfiguration
 {
     public static final int SRC_CONTROL_STREAM_ID = AeronArchive.Configuration.CONTROL_STREAM_ID_DEFAULT;
-    public static final String SRC_CONTROL_REQUEST_CHANNEL = "aeron:udp?endpoint=localhost:8090";
-    public static final String SRC_CONTROL_RESPONSE_CHANNEL = "aeron:udp?endpoint=localhost:8091";
-    public static final String DST_CONTROL_REQUEST_CHANNEL = "aeron:udp?endpoint=localhost:8095";
-    public static final String DST_CONTROL_RESPONSE_CHANNEL = "aeron:udp?endpoint=localhost:8096";
-    public static final String SRC_REPLICATION_CHANNEL = "aeron:udp?endpoint=localhost:8040";
-    public static final String DST_REPLICATION_CHANNEL = "aeron:udp?endpoint=localhost:8041";
+    public static final String SRC_CONTROL_REQUEST_CHANNEL = "aeron:udp?endpoint=112.120.203.143:8090";
+    public static final String SRC_CONTROL_RESPONSE_CHANNEL = "aeron:udp?endpoint=112.120.203.143:8091";
+    public static final String DST_CONTROL_REQUEST_CHANNEL = "aeron:udp?endpoint=43.3.106.222:8095";
+    public static final String DST_CONTROL_RESPONSE_CHANNEL = "aeron:udp?endpoint=43.3.106.222:8096";
+    public static final String SRC_REPLICATION_CHANNEL = "aeron:udp?endpoint=112.120.203.143:8040";
+    public static final String DST_REPLICATION_CHANNEL = "aeron:udp?endpoint=43.3.106.222:8041";
 
     public static final String CHANNEL_PROP = "aeron.sample.channel";
     public static final String STREAM_ID_PROP = "aeron.sample.streamId";
