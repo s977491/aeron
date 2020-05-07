@@ -32,7 +32,11 @@ import org.agrona.concurrent.SigInt;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.agrona.concurrent.YieldingIdleStrategy;
 import org.agrona.concurrent.status.CountersReader;
+import sun.misc.Signal;
+import sun.misc.SignalHandler;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -54,8 +58,8 @@ public class ReplicatedBasicPublisher {
 
     private static final UnsafeBuffer BUFFER = new UnsafeBuffer(BufferUtil.allocateDirectAligned(256, 64));
     private static final ChannelUriStringBuilder RECORDED_CHANNEL_BUILDER = new ChannelUriStringBuilder()
-            .media("ipc");
-//            .endpoint("localhost:3333")
+            .media("udp")
+            .endpoint("239.255.255.255:3333");
 //            .termLength(TERM_LENGTH);
 
     private static final String EXTEND_CHANNEL = new ChannelUriStringBuilder()
@@ -69,7 +73,35 @@ public class ReplicatedBasicPublisher {
     private static long recordingId;
     private static int sessionId;
 
+    private static enum TestEnum {
+        A(1), B(3);
+
+        private final int i;
+
+        public int getI() {
+            return i;
+        }
+
+        TestEnum(int i) {
+            this.i = i;
+        }
+    }
+    private static <T extends Enum<T>>  T testFun(Class<T> testEnumClass, String b) {
+        for (T enumConstant : testEnumClass.getEnumConstants()) {
+            System.out.println(enumConstant.toString());
+        }
+        return Enum.valueOf(testEnumClass, b);
+    }
+
+    private static List<SignalHandler> handlers = new ArrayList<>();
+    private static void register(SignalHandler runnable) {
+        handlers.add(Signal.handle(new Signal("INT"), runnable));
+    }
+
     public static void main(final String[] args) throws Exception {
+        TestEnum a  = testFun(TestEnum.class, "B");
+        System.out.println(a.toString());
+
         String CHANNEL = RECORDED_CHANNEL_BUILDER.build();
         System.out.println("Publishing to " + CHANNEL + " on stream id " + STREAM_ID);
 
@@ -162,7 +194,7 @@ public class ReplicatedBasicPublisher {
 
 //                    Thread.sleep
 //                    Thread.sleep(TimeUnit.SECONDS.toMillis(1));
-                        Thread.sleep(1);
+                        Thread.sleep(500);
                     }
                     System.out.print("Offering " + i + "/" + NUMBER_OF_MESSAGES + " - ");
 

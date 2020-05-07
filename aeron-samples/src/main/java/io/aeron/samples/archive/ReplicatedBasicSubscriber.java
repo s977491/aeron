@@ -41,7 +41,7 @@ public class ReplicatedBasicSubscriber
     // Use a different stream id to avoid clash with live stream
     private static final int REPLAY_STREAM_ID = SampleConfiguration.STREAM_ID + 1;
 
-    private static final String CHANNEL = SampleConfiguration.CHANNEL;
+    private static final String CHANNEL = "aeron-spy:aeron:udp?endpoint=239.255.255.255:3333";
     private static final int FRAGMENT_COUNT_LIMIT = SampleConfiguration.FRAGMENT_COUNT_LIMIT;
 
     public static void main(final String[] args)
@@ -65,7 +65,7 @@ public class ReplicatedBasicSubscriber
 
         try (AeronArchive archive = AeronArchive.connect(archiveCtx))
         {
-            final long recordingId = findLatestRecording(archive);
+            final long recordingId = 0;
             final long position = 0L;
             final long length = Long.MAX_VALUE;
 
@@ -86,7 +86,7 @@ public class ReplicatedBasicSubscriber
                 final byte[] data = new byte[length];
                 buffer.getBytes(offset, data);
 
-                System.out.println(String.format(
+                System.out.println(String.format(header.position() + " " +
                         "Message to stream %d from session %d (%d@%d) <<%s>>",
                         streamId, header.sessionId(), length, offset, new String(data)));
             };
